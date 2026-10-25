@@ -17,8 +17,13 @@ jobs:
       - run: make eval AWS_PORT=14566 PROM_PORT=19090 RUN=ci
         env:
           FINOPS_LLM_MODE: replay   # committed cassettes in eval/cassettes/: no network, no API key
+      - run: make k8s-eval K8S_PORT=19190
+        env:
+          FINOPS_LLM_MODE: replay   # every narrative prompt has a committed cassette; a missing one fails the step
       - if: always()
         uses: actions/upload-artifact@v4
         with:
           name: run-report
-          path: runs/ci/
+          path: |
+            runs/ci/
+            runs/k8s-local/
