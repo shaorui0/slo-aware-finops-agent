@@ -10,6 +10,6 @@
 - [x] 2.3 提交 eval，记下 sha
 
 ## 3. 结果与验收
-- [ ] 3.1 `eval/EXPERIMENTS.md` 追加「主线 K8s：预注册新世界」
-- [ ] 3.2 验收：`git log` 中 freeze 早于 eval；`python3 -W ignore -m unittest discover -t . -s testenv -p 'test_*.py'` 与 `-s eval` 通过；`make k8s-eval` 基础世界不变；`python3 tools/check_rules.py --docs` 通过
-- [ ] 3.3 evidence.md、HTML 报告、博客笔记（末行 `PROGRESS_ROW:`）
+- [x] 3.1 `eval/EXPERIMENTS.md` 追加「主线 K8s：预注册新世界」
+- [x] 3.2 验收：`git log` 中 freeze 早于 eval；`python3 -W ignore -m unittest discover -t . -s testenv -p 'test_*.py'` 与 `-s eval` 通过；`make k8s-eval` 基础世界不变；`python3 tools/check_rules.py --docs` 通过
+- [x] 3.3 evidence.md、HTML 报告、博客笔记（末行 `PROGRESS_ROW:`）

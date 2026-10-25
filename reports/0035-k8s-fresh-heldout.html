@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0035-k8s-fresh-heldout</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0035-k8s-fresh-heldout</h1>
+</header>
+<h1 id="c0035-主线-k8s预注册新世界">c0035 主线 K8s：预注册新世界</h1>
+<h2 id="一句话">一句话</h2>
+<p>在一个先冻结、之后才评估一次的全新合成世界上，K8s agent 的
+verdict_accuracy 从样本内的 1.0 降到 0.90（18/20），并出现 1 条
+<code>unsafe_allow</code>：一个内存持续爬升的服务被判 ALLOW。</p>
+<h2 id="unsafe_allow-1">unsafe_allow = 1</h2>
+<p><code>session-store/memory</code>：expect DENY，agent 给 ALLOW，推荐
+2.9375 GiB（当前 4 GiB）。工作集在 21 天里从约 0.8 涨到约 2.4
+GiB，不复位；推荐值取窗口最大值 ×1.2，一周内会被追上。A、B、C、D
+四个条件都 PASS，因为契约里没有趋势条件。没有修，记为未来工作。</p>
+<h2 id="结果">结果</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>基础世界（样本内）</th>
+<th>新世界（预注册）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>verdict_accuracy</td>
+<td>1.0（18/18）</td>
+<td>0.90（18/20）</td>
+</tr>
+<tr>
+<td>unsafe_allow</td>
+<td>0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>unknown_recall</td>
+<td>1.0（2/2）</td>
+<td>1.0（2/2）</td>
+</tr>
+<tr>
+<td>request_in_range</td>
+<td>1.0（8/8）</td>
+<td>0.7692（10/13）</td>
+</tr>
+<tr>
+<td>realizable_accuracy</td>
+<td>1.0（2/2）</td>
+<td>0.6667（2/3）</td>
+</tr>
+</tbody>
+</table>
+<p>n=20，verdict_accuracy 的 Wilson 95% 区间约 [0.70,
+0.97]，与基础世界的 [0.82, 1.0] 重叠。</p>
+<h2 id="协议">协议</h2>
+<p>freeze <code>7eb267b</code> 早于 eval <code>73b626c</code>；freeze
+之前没有读 policy、recommend、collect 与阈值，没有运行 agent
+与评分器；评估之后世界与 expect
+未改。<code>bash eval/k8s_heldout.sh</code> 复现（回放盒带）。</p>
+<h2 id="漏检与归因未修">漏检与归因（未修）</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>workload/资源</th>
+<th>expect</th>
+<th>got</th>
+<th>层</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>session-store/memory</td>
+<td>DENY</td>
+<td>ALLOW 2.94</td>
+<td>policy：无趋势条件</td>
+</tr>
+<tr>
+<td>edge-gateway/memory</td>
+<td>ALLOW [0.65, 0.8]</td>
+<td>NOOP 1.75</td>
+<td>collect：用量查询没有按容器过滤，sidecar 混入</td>
+</tr>
+<tr>
+<td>edge-gateway/cpu</td>
+<td>区间 [0.25, 0.35]</td>
+<td>0.55</td>
+<td>collect：同上</td>
+</tr>
+<tr>
+<td>route-quote/cpu</td>
+<td>区间 [1.5, 1.9]</td>
+<td>0.30</td>
+<td>recommend：契约规定 p99 ×1.3，看不到极尖的尾部（部分是我的 expect
+与契约不一致）</td>
+</tr>
+<tr>
+<td>ledger-api/cpu</td>
+<td>realizable [270, 290]</td>
+<td>140.16</td>
+<td>定价输入：agent 用默认牌价 0.192，世界是 0.384；节点数 7→6
+正确（主要是我的世界与输入通道不匹配）</td>
+</tr>
+</tbody>
+</table>
+<p>守住的难题：每周峰值（DENY，靠高峰小时的 throttling 比例）、已被
+throttle 的服务（DENY）、数据缺口（UNKNOWN）、SLO
+指标缺失（REQUIRE_APPROVAL）、不同时刻的批任务（ALLOW）。</p>
+<h2 id="边界">边界</h2>
+<p>一个世界，n=20；同一作者、同一生成器家族；合成数据；叙述每条只录一次。详见
+<code>eval/EXPERIMENTS.md</code> §8。</p>
+</body>
+</html>

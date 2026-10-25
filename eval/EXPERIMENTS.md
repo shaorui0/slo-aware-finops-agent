@@ -346,3 +346,96 @@ savings_accuracy 0.5385 = 7/13，其中偏低有两层不是 agent 的错：
 ### 7.8 下一步（只记录，不在本 change 做）
 
 按价值：（1）线索生成器补「持续高位」的稳态异常（例如 NAT 字节费占 EC2-Other 比例过高、没有 gateway endpoint 时直接出线索，不依赖跳变或历史基线）；（2）`unattributed_transfer` 的取证器接上 `db_client_bytes_total` 或同类流量对指标；（3）确定性未挂载卷检测器读 `keep-until`、`purpose` 等保留 tag；（4）归因检测增加 ASG 成员与 job 标签的比对；（5）评分器对多资源标准答案按条目聚合金额；（6）修完任何一条之后，这个世界对该失败即被污染，需要再造一个新世界，并在改动前冻结。
+
+## 8. 主线 K8s：预注册新世界（c0035）
+
+主线 K8s agent 在基础世界 `testenv/k8s_world.yaml` 上是 18/18，但这个世界就是 agent 被构建、阈值被调的世界，1.0 是样本内的。这一节是 §7 在主线上的对应物：一个全新的合成世界，标准答案先冻结提交，之后只评估一次，agent、阈值、世界都不改。
+
+### 8.0 unsafe_allow = 1（放在最前）
+
+**`session-store/memory`：expect DENY，agent 给出 ALLOW，推荐 2.9375 GiB（当前 4 GiB）。** 这是一个内存持续爬升的服务（工作集 0.8 → 约 2.4 GiB，21 天内每天约 +0.076 GiB，不复位）。推荐值取窗口最大值 ×1.2，一周之内就会被追上。agent 的四个条件 A、B、C、D 全部 PASS，因为契约里没有「趋势」这个条件。按契约的硬闸，`unsafe_allow` 非 0 即失败。这条没有被修，见 8.5。
+
+### 8.1 协议与提交顺序
+
+| 阶段 | commit | 内容 |
+|---|---|---|
+| 提案与盲测协议 | `6deb1de` | proposal.md：先写协议，后做事 |
+| 冻结（freeze） | `7eb267b` | `testenv/heldout/k8s_fresh_world.yaml`（10 个 workload、20 条 `expect`、每条带理由）、`k8s_fresh_slos.yaml`、`testenv/k8s_world.py` 只加新 profile 种类（基础世界序列的 sha256 与扩展前相同，由单测钉住）、`testenv/test_k8s_fresh.py` |
+| 评估（eval） | `73b626c` | `eval/k8s_heldout.sh`；`FINOPS_LLM_MODE=record` 录制 20 条叙述盒带（只新增，没有改任何已有盒带）；原始输出落盘 |
+
+freeze 早于 eval。`git diff 7eb267b HEAD -- testenv/heldout/` 为空：评估之后世界与 `expect` 没动过。
+
+盲测：freeze 之前没有读过 `policy.py`、`recommend.py`、`collect.py`、`config/k8s_policy.yaml`，没有运行过 agent 与评分器；`expect` 由 SRE 判断与契约规则写出，数值区间由世界生成器自己的输出算出（不是 agent 的）。读过的只有契约 spec、基础世界与目录（看格式）、世界生成器、`eval/score_k8s.py`（只为确认 `expect` 字段怎么被读）。评分器本来就有 `--world`，没有改。叙述走真实 `claude -p` 录制（`claude` 在 PATH 上），20 条全是 LLM 叙述，`narrative_ungrounded` 为 0。回放与录制的决策逐字段相同。
+
+### 8.2 世界和基础世界哪里不同
+
+10 个 workload，名字与基础世界全不相同。命名空间 payments、pricing、platform、risk、finance、data、edge；节点换成 m6i.2xlarge（7 个，上限 12）；周期 2026-10-04 到 10-25。基础世界没有的 8 种情形：
+
+| workload | 情形 | 难度 |
+|---|---|---|
+| rate-engine | 每周三 10:00 UTC 半小时的峰值，14 天窗口只含两次 | 难 |
+| session-store | 内存持续爬升（泄漏趋势），今天的峰值低估下周 | 难 |
+| fraud-score | SLO 在目录里，`slo_*` 指标缺失 | 难 |
+| edge-gateway | sidecar 的用量大于应用容器，同一个 workload 标签 | 难 |
+| quote-cache | limit 低于需求，已经在被 throttle | 难 |
+| route-quote | p99 平、p99.9 极尖（约 0.4% 的样本到 6 倍） | 难（区间） |
+| eod-reconcile | 批任务 21:00 UTC（基础世界是 02:00），deadline 余量充足 | 中 |
+| catalog-sync | 窗口中段 8 天数据缺口（21 天跨度，6/14 的覆盖） | 难 |
+| ledger-api、ingest-gw | 干净的 ALLOW、NOOP；ledger-api 与 session-store 带装箱兑现区间 | 易 |
+
+同一个作者、同一个生成器家族、同一个契约，不是独立分布。基础世界里的 HPA、burning-slo、new-service 等情形这次没有重复。
+
+### 8.3 结果
+
+单次评估，`bash eval/k8s_heldout.sh` 复现（原始输出：`openspec/changes/c0035-k8s-fresh-heldout/` 下的 `eval_record_output.txt`、`k8s_fresh_decisions.json`、`k8s_fresh_eval.json`）。
+
+| 指标 | 基础世界（样本内） | 新世界（预注册） |
+|---|---|---|
+| verdict_accuracy | 1.0（18/18） | **0.90（18/20）** |
+| unsafe_allow | 0 | **1** |
+| unknown_recall | 1.0（2/2） | 1.0（2/2） |
+| request_in_range | 1.0（8/8） | **0.7692（10/13）** |
+| realizable_accuracy | 1.0（2/2） | **0.6667（2/3）** |
+
+n=20 个 (workload, resource)；verdict_accuracy 18/20 的 Wilson 95% 区间约 [0.70, 0.97]，基础世界 18/18 约 [0.82, 1.0]，两个区间有重叠，所以 0.10 的落差本身不显著。比统计量更重要的是失败的性质：一条 unsafe ALLOW。评分器闸门失败（退出码 1）：`unsafe_allow` 1、`request_in_range` 0.7692 低于 0.8、各指标低于基线。`verdict_accuracy` 0.90 刚好过 0.9 的下限。
+
+十个 workload 里命中 8 个整体（两个资源的 verdict 都对），其中三条难题命中了：rate-engine/cpu 判 DENY（周峰值被「高峰小时的逐小时 throttling 比例」的最大值 0.084 抓到（≥ 0.05），条件 B FAIL，尽管 p99 约 0.2 看不到）、quote-cache/cpu 判 DENY（已经 throttle 0.33）、catalog-sync 与 fraud-score 的 UNKNOWN 与 REQUIRE_APPROVAL 都对，没有因为 SLO 指标缺失或数据缺口而放行。
+
+### 8.4 逐条漏检（原样，未修）
+
+| workload/资源 | expect | got | 层 | 原因 |
+|---|---|---|---|---|
+| **session-store/memory**（unsafe） | DENY，区间 [3.3, 3.9] | ALLOW 2.9375 | policy 规则 / recommend | 契约里 A、B、C、D 没有趋势项；推荐值 = 窗口最大 working set ×1.2，B 只比较「推荐 ≥ 窗口峰值 ×(1+margin)」（2.94 ≥ 2.42 × 1.1）与「峰值 < 0.9 × limit」（2.42 / 5 ≈ 0.48），都通过。线性爬升一周后超过推荐值 |
+| edge-gateway/memory | ALLOW，区间 [0.65, 0.8] | NOOP（推荐 1.75，当前 1.5） | collect | 取数选择器只按 `workload` 聚合，没有按应用容器名过滤，sidecar（约 1.4 GiB）的 working set 被当成应用的最大值。容器名在同一轮早先的查询里已经知道（`kube_deployment_spec_replicas` 的 `container` 标签），只是没有用在用量查询上 |
+| edge-gateway/cpu | ALLOW，区间 [0.25, 0.35] | ALLOW 0.55 | collect | 同上；p99 0.42 混入 sidecar 的约 0.4 核。verdict 碰巧对，推荐值偏大 2 倍，请求区间失分 |
+| route-quote/cpu | ALLOW，区间 [1.5, 1.9] | ALLOW 0.30 | recommend（契约规则本身） | 契约规定 p99 ×1.3。窗口内 p99 约 0.22，最大 1.31，推荐 0.30 在尖峰（约 1.3 核）下只有约 23% 的余量。verdict 对，数值区间失分。这条 `expect` 是我按「谨慎的 SRE 会按尖峰定容」写的，与契约的 p99 规则不一致，**性质是契约规则与我预期的分歧，不是实现错误**。条件 B 本身（新 request ≥ p99 ×(1+margin)）也只看 p99 |
+| ledger-api/cpu（realizable） | [270, 290] | 140.16 | 定价输入（世界 / 契约 / 管线） | 节点数是对的（7 → 6）。金额偏一半：agent 用 `config/k8s_policy.yaml` 的默认牌价 0.192 美元/小时（m6i.xlarge），而我的世界用的是 m6i.2xlarge 的 0.384。`--nodes-from` 只读 `nodes.min/max`，世界文件的 `pricing` 没有传到 agent。**这条主要是我的世界与 agent 的输入通道不匹配（expect 假设了世界定价），不是装箱错误**；按节点数计 3/3 正确 |
+
+没有出现的错误：fraud-score、catalog-sync 没有被放行，quote-cache 没有被降配，eod-reconcile（不同时刻的批任务）、ledger-api、ingest-gw 全对，rate-engine/cpu 的周峰值被抓到，只是机制是高峰小时的 throttling 比例，而不是推荐器看见了峰值（推荐值仍是 0.30）。
+
+### 8.5 如果要修（只记录，不在本 change 做）
+
+按价值：
+
+1. **趋势条件**（policy / recommend，解决 unsafe ALLOW）：内存取每日最大值做线性回归，若按斜率外推 `horizon_days`（例如 7 天）后的峰值 ×(1+margin) 超过推荐值，B 判 FAIL 或降为 REQUIRE_APPROVAL，理由写「持续爬升，先查泄漏」。
+2. **按容器过滤**（collect）：用量、throttling、requests、limits 的选择器加 `container="<name>"`；sidecar 进入决策时另出一条（或明确排除）。
+3. **推荐的尾部**（recommend，需要先改契约）：cpu 推荐取 `max(p99 ×1.3, p99.9 ×(1+小余量))`，或 B 条件对窗口最大值也设余量；是否采用要先在契约里讨论，因为这会改变基础世界里已验证的推荐值。
+4. **定价通道**（pipeline）：`--nodes-from` 一并读取世界文件的 `pricing`（或加 `--pricing`），契约里写明「调用方用世界文件的 pricing 覆盖」应当如何传入。
+5. **窗口里的周期**：条件 A 的数据说明里记录观察到的周期数，使「只含两次周峰值」这样的情形显式出现在 `reasons`。
+
+任何一条修完，这个世界对该条即被污染，需要再造一个新世界并在改动前冻结。
+
+### 8.6 能证明什么、不能证明什么
+
+能证明：
+
+- 在一个事先冻结的新世界上，verdict_accuracy 是 0.90 而不是 1.0，并且出现了 1 条 unsafe ALLOW（内存泄漏趋势）；
+- 在 8 种新情形里，agent 守住了数据缺口、SLO 指标缺失（UNKNOWN 与 REQUIRE_APPROVAL，没有被放行）、已被 throttle 的服务和周峰值（DENY）；输在趋势、sidecar 与尖峰尾部这三类契约没有覆盖的信息上；
+- 失败层在 policy/recommend/collect，不在 LLM 叙述（20 条叙述的数字全部落地）。
+
+不能证明：
+
+- **泛化水平。** 一个世界，n=20，区间 [0.70, 0.97]；
+- **独立性。** 同一个作者、同一个生成器家族；两条（route-quote/cpu 的区间、ledger-api/cpu 的金额）部分是我的 `expect` 与契约规则或输入通道不一致，不全是 agent 的缺陷；
+- **真实集群上的失败率。** 合成数据没有真实世界的噪声与形状；
+- **录制的稳定性。** 每条叙述只录了一次。
