@@ -12,7 +12,11 @@ PromQL subset:
 Anything else returns a Prometheus-style bad_data error.
 
 Data exists only inside world.yaml `account.period`, at 5-minute resolution.
-Usage: python3 -m testenv.metrics_server [--port 9090]
+Usage: python3 -m testenv.metrics_server [--port 9090] [--world k8s|<file>] [--as-of <ts>]
+
+`--world k8s` (or a k8s world/scenario yaml) serves the synthetic K8s world of testenv/k8s_world.py instead:
+cAdvisor / kube-state-metrics / SLO series per pod, over the same PromQL subset. Points before a workload's
+`data_days` are absent. Without the flag everything below is unchanged.
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from testenv import k8s_world
 from testenv.world import JOB_BY_PROFILE, STEP, cpu, load, use as use_world, _hour, _office, _weekday, _bell
 
 METADATA = {
@@ -51,8 +56,25 @@ class Series:
         self.labels, self.kind, self.values = labels, kind, values
 
 
+K8S = None   # None = AWS world; else {"path": ..., "as_of": ...} (set with use_k8s)
+
+
+def use_k8s(enabled=True, path=None, as_of=None):
+    """Serve the K8s world (testenv/k8s_world.py) instead of the AWS one; use_k8s(False) switches back."""
+    global K8S
+    K8S = {"path": path, "as_of": as_of} if enabled else None
+    build.cache_clear()
+
+
+def _build_k8s():
+    grid, raw = k8s_world.build_series(k8s_world.load(K8S["path"], K8S["as_of"]))
+    return grid, [Series({"__name__": l["__name__"], **{k: v for k, v in l.items() if k != "__name__"}}, kind, vals) for l, kind, vals in raw]
+
+
 @functools.lru_cache(maxsize=1)
 def build():
+    if K8S is not None:
+        return _build_k8s()
     w = load()
     s, e = w.period
     t0 = datetime(s.year, s.month, s.day, tzinfo=timezone.utc).timestamp()
@@ -232,7 +254,7 @@ def evaluate(expr, t):
             if not match(s, matchers):
                 continue
             lo, hi = bisect.bisect_right(grid, t - rng), bisect.bisect_right(grid, t)
-            window = s.values[lo:hi]
+            window = [v for v in s.values[lo:hi] if v is not None]
             if len(window) < 2 and fn in ("rate", "increase") or not window:
                 continue
             labels = {k: v for k, v in s.labels.items() if k != "__name__"}
@@ -258,7 +280,7 @@ def evaluate(expr, t):
     if idx < 0 or t - grid[idx] > 300:
         return []
     for s in series:
-        if match(s, matchers):
+        if match(s, matchers) and s.values[idx] is not None:
             out.append((dict(s.labels), s.values[idx]))
     return out
 
@@ -335,7 +357,7 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 return self._json(200, {"status": "success", "data": sorted({s.labels[m.group(1)] for s in series if m.group(1) in s.labels})})
             if path == "/api/v1/metadata":
-                return self._json(200, {"status": "success", "data": {k: [{"type": t, "help": h, "unit": ""}] for k, (t, h) in METADATA.items()}})
+                return self._json(200, {"status": "success", "data": {k: [{"type": t, "help": h, "unit": ""}] for k, (t, h) in ({**METADATA, **k8s_world.K8S_METADATA} if K8S is not None else METADATA).items()}})
             return self._json(404, {"status": "error", "errorType": "not_found", "error": path})
         except BadQuery as e:
             return self._json(400, {"status": "error", "errorType": "bad_data", "error": str(e)})
@@ -345,9 +367,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=9090)
-    ap.add_argument("--world", help="world file (full world or scenario overlay); default testenv/world.yaml")
+    ap.add_argument("--world", help="world file (full world or scenario overlay); default testenv/world.yaml; "
+                                    "`k8s` or a k8s world/scenario yaml serves the K8s world")
+    ap.add_argument("--as-of", help="k8s world only: truncate the world at this timestamp (ISO or epoch)")
     a = ap.parse_args(argv)
-    use_world(a.world)
+    if a.world == "k8s" or (a.world and k8s_world.is_k8s_world_file(a.world)):
+        use_k8s(True, None if a.world == "k8s" else a.world, a.as_of)
+    else:
+        use_k8s(False)
+        use_world(a.world)
     build()
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     print(f"test-metrics-server listening on http://{a.host}:{a.port}", file=sys.stderr, flush=True)

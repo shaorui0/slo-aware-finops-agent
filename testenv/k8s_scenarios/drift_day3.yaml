@@ -1,0 +1,9 @@
+# "day 3" run: two days later, api-steady load +60% from the last day (period_end - 1d).
+# Serve with:  python3 -m testenv.metrics_server --world testenv/k8s_scenarios/drift_day3.yaml
+# Day-1 view of the same file: add --as-of 2026-10-26T00:00:00Z
+scenario: {name: drift_day3, base: testenv/k8s_world.yaml}
+cluster:
+  period: {end: "2026-10-28T00:00:00Z"}
+add_events:
+  api-steady:
+    - {type: load, at: "2026-10-27T00:00:00Z", factor: 1.6}
