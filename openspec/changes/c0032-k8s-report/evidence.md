@@ -48,7 +48,7 @@ check_rules: OK
 ```
 $ bash scripts/k8s_report_samples.sh
 wrote reports/k8s-sample/daily.html reports/k8s-sample/weekly.html reports/k8s-sample/monthly.html
-$ grep -c "/Users/" reports/k8s-sample/*.html
+$ grep -c "本机用户目录前缀" reports/k8s-sample/*.html
 reports/k8s-sample/monthly.html:0
 reports/k8s-sample/weekly.html:0
 reports/k8s-sample/daily.html:0
