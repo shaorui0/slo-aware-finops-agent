@@ -1,0 +1,213 @@
+# PRE-REGISTERED fresh K8s world (c0035). Frozen in a commit before the agent or the scorer ever touched it.
+# Schema: c0027 k8s-mainline spec + c0031 delta (SLO catalog is a separate file: k8s_fresh_slos.yaml; nodes.max is read by the agent).
+# Served by `python3 -m testenv.metrics_server --world testenv/heldout/k8s_fresh_world.yaml`; the eval reads `expect`.
+#
+# How `expect` was written: from SRE judgment plus the contract's stated rules (c0027 decision order, conditions A-D), i.e. what a
+# careful reviewer would decide looking at the data. No agent source, no policy thresholds were read first. request_range uses the
+# contract's sizing rule (cpu: p99 per-pod x 1.3, memory: max working set x 1.2) except where the `why` says the reviewer would
+# size differently; numbers were computed from this world's generator output, not from the agent.
+#
+# Situations the base world (testenv/k8s_world.yaml) does not contain:
+#   rate-engine    weekly (not daily) peak; a 14-day window sees it twice
+#   session-store  memory creep: working set rises monotonically, no reset
+#   fraud-score    SLO defined in the catalog but slo_* metrics are absent
+#   edge-gateway   sidecar container with larger usage than the app container, same workload label
+#   quote-cache    limit already below the sizing demand; throttled today
+#   eod-reconcile  batch at 21:00 UTC (base: 02:00) with comfortable deadline margin
+#   catalog-sync   8-day data gap in the middle of the window
+#   route-quote    very spiky p99.9 on a flat p99
+# `range_note: upsize` marks a DENY whose request_range is above the current request (a "could consider raising" figure).
+cluster:
+  name: finops-k8s-fresh
+  period: {start: "2026-10-04T00:00:00Z", end: "2026-10-25T00:00:00Z"}   # 21 days, Sun to Sun
+  step_seconds: 300
+
+pricing: {node_type: m6i.2xlarge, node_hour_usd: 0.384, cpu_core_hour_usd: 0.0316, mem_gib_hour_usd: 0.0041}
+
+nodes: {count: 7, min: 4, max: 12, allocatable: {cpu: 7.6, memory_gib: 29.0}}
+
+workloads:
+  - name: ledger-api
+    namespace: payments
+    team: team-ledger
+    kind: Deployment
+    replicas: 6
+    container: {name: app, requests: {cpu: "1.5", memory: "3Gi"}, limits: {cpu: "3", memory: "4Gi"}}
+    slo: {availability: 0.9995, p99_seconds: 0.25}
+    profile:
+      cpu: {kind: flat, base: 0.22, jitter: 0.1}
+      mem: {kind: flat, base_gib: 1.1, jitter: 0.03}
+      http: {rps: 40, p99_base: 0.08}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.3, 0.4], realizable_usd_month: [270, 290], why: "EASY. Flat ~0.22 core, no peak, SLO healthy; 1.5 -> ~0.35 core x6 pods frees 6.9 cores, which takes the cluster from 7 to 6 nodes"}
+      memory: {verdict: ALLOW, request_range: [1.3, 1.6], realizable_usd_month: [0, 0], why: "EASY. ~1.1 GiB flat vs 3 GiB; but the cluster is cpu-bound, so a memory-only cut does not remove a node (realizable 0)"}
+
+  - name: route-quote
+    namespace: pricing
+    team: team-pricing
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "4", memory: "2Gi"}, limits: {cpu: "4", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: spiky, base: 0.2, jitter: 0.08, spike_prob: 0.004, spike_value: 1.2}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.02}
+      http: {rps: 60, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [1.5, 1.9], why: "HARD (sizing). Median ~0.2 core but isolated 5-minute spikes to ~1.2 core (about 0.4% of samples, so p99 stays flat and p99.9 is 6x). Cutting is safe (limit 4, no throttle at the spike) but a careful reviewer sizes to the spike, ~1.2 x 1.3, not to p99 ~0.2 x 1.3 = ~0.3"}
+      memory: {verdict: ALLOW, request_range: [0.8, 0.95], why: "flat ~0.7 GiB vs 2 GiB"}
+
+  - name: rate-engine
+    namespace: pricing
+    team: team-pricing
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "4", memory: "4Gi"}, limits: {cpu: "4", memory: "5Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: weekly, base: 0.18, jitter: 0.08, peak_dow: 2, peak_hour: 10, peak_hours: 0.5, peak_value: 3.1}
+      mem: {kind: flat, base_gib: 2.0, jitter: 0.02}
+      throttle: {onset: 0.6, slope: 1.0, cap: 0.6}
+      http: {rps: 12, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [4.0, 4.6], range_note: upsize, why: "HARD (weekly peak). ~0.18 core all week, but Wednesday 10:00-10:30 UTC reaches ~3.3 core (84% of the limit) and throttles (~24% of periods). A 14-day window holds it twice, only 12 samples per pod, far below the 1% tail, so p99 ~0.2 is blind to it. Data is long enough (21 days, 3 occurrences) and the peak is observed: cutting to ~0.3 would throttle the weekly job. Sizing that covers the peak is ~3.3 x 1.3 ~ 4.4, i.e. no cut at all"}
+      memory: {verdict: ALLOW, request_range: [2.3, 2.7], why: "flat ~2.0 GiB vs 4 GiB, no weekly memory bump"}
+
+  - name: session-store
+    namespace: platform
+    team: team-platform
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "4Gi"}, limits: {cpu: "2", memory: "5Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.3, jitter: 0.08}
+      mem: {kind: creep, start_gib: 0.8, slope_gib_per_day: 0.076, jitter: 0.01}
+      http: {rps: 15, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.4, 0.5], realizable_usd_month: [0, 0], why: "EASY. Flat ~0.3 core, SLO healthy; 2 pods x 0.55 core does not remove a node (realizable 0)"}
+      memory: {verdict: DENY, request_range: [3.3, 3.9], range_note: "projected 28-day peak x1.2", why: "HARD (leak trend). Working set climbs ~0.076 GiB/day, 0.8 -> ~2.4 GiB over the window, never resetting. A peak-based cut (max 2.4 x 1.2 ~ 2.9 GiB) is outgrown in about a week; the cut is wrong in principle, fix the leak first. Peak/limit is only ~0.5 so no OOM guard fires today"}
+
+  - name: fraud-score
+    namespace: risk
+    team: team-risk
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.15, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.03}
+      http: {rps: 10, p99_base: 0.12}
+      slo_metrics: false
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.2, 0.25], why: "HARD (visibility gap). The SLO is in the catalog, but slo_burn_rate_1h and slo_error_budget_remaining_ratio are absent from the metrics: the objective is known, the current burn is not. Usage is low, data complete, but C cannot be PASS from the objective alone: C UNKNOWN -> REQUIRE_APPROVAL, never ALLOW"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [0.85, 1.0], why: "same: burn rate unobservable, C UNKNOWN"}
+
+  - name: edge-gateway
+    namespace: platform
+    team: team-platform
+    kind: Deployment
+    replicas: 3
+    container: {name: gateway, requests: {cpu: "1", memory: "1.5Gi"}, limits: {cpu: "2", memory: "2Gi"}}
+    sidecar: {name: mesh-proxy, requests: {cpu: "0.1", memory: "0.25Gi"}, limits: {cpu: "1", memory: "2Gi"}, cpu_base: 0.4, cpu_jitter: 0.05, mem_gib: 1.4, mem_jitter: 0.02}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.18, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.55, jitter: 0.03}
+      http: {rps: 25, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.25, 0.35], why: "HARD (sidecar skew). Each pod also runs mesh-proxy at ~0.4 core / 1.4 GiB, larger than the gateway container (~0.18 core / 0.55 GiB). The request being tuned belongs to the gateway container only: ~0.19 x 1.3 -> ~0.3. Pooling both containers per pod would read ~0.4 and recommend ~0.55"}
+      memory: {verdict: ALLOW, request_range: [0.65, 0.8], why: "gateway working set ~0.55 GiB x 1.2 ~ 0.7; the sidecar's 1.4 GiB must not be attributed to the gateway container (pooled max would suggest ~1.7 and a NOOP)"}
+
+  - name: quote-cache
+    namespace: pricing
+    team: team-pricing
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "0.5", memory: "1Gi"}, limits: {cpu: "0.6", memory: "1.5Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.55, jitter: 0.05}
+      mem: {kind: flat, base_gib: 0.5, jitter: 0.02}
+      throttle: {onset: 0.6, slope: 1.0, cap: 0.5}
+      http: {rps: 20, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [0.7, 0.85], range_note: upsize, why: "HARD (already throttled). Usage ~0.55 core sits at 92% of a 0.6 core limit and above the 0.5 core request; throttling is continuous (~35% of periods). Demand x 1.3 ~ 0.75 is above both the request and the limit: the reviewer's answer is 'under-provisioned, do not cut, consider raising'. The raw usage number looks like a cheap workload but is clipped by the limit"}
+      memory: {verdict: ALLOW, request_range: [0.6, 0.7], why: "~0.5 GiB flat vs 1 GiB; memory is independent of the cpu throttle and p99 latency stays inside the SLO"}
+
+  - name: eod-reconcile
+    namespace: finance
+    team: team-finance
+    kind: Deployment
+    replicas: 1
+    container: {name: job, requests: {cpu: "6", memory: "8Gi"}, limits: {cpu: "6", memory: "10Gi"}}
+    slo: {deadline_seconds: 7200}
+    profile:
+      cpu: {kind: batch, start_hour: 21, hours: 1.5, active: 2.4, idle: 0.02, jitter: 0.03}
+      mem: {kind: batch, idle_gib: 0.4, active_gib: 3.1, jitter: 0.02}
+      job: {base_seconds: 3600, jitter_seconds: 120, finish_hour: 22.0}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [3.1, 3.4], why: "MEDIUM (cron at 21:00 UTC, not 02:00). Active ~2.4 core for 1.5 h every day, which is 6% of samples so p99 lands inside the window. Last runs take ~3600 s against a 7200 s deadline (50%), a comfortable margin, so unlike the base-world nightly job nothing blocks the change"}
+      memory: {verdict: ALLOW, request_range: [3.7, 4.1], why: "peak ~3.1 GiB during the window x 1.2 ~ 3.8; deadline margin is comfortable"}
+
+  - name: catalog-sync
+    namespace: data
+    team: team-data
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "0.5", memory: "1Gi"}, limits: {cpu: "1", memory: "2Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.1, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.45, jitter: 0.03}
+      http: {rps: 6, p99_base: 0.12}
+      gaps:
+        - {from: "2026-10-13T00:00:00Z", to: "2026-10-21T00:00:00Z"}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.15, 0.2], why: "HARD (mid-window gap). The scrape has no samples for 8 days (Oct 13-21): only 13 of 21 days have data and, inside the last 14 days, 6 of 14 (43% coverage). A start-to-end span of 21 days looks long enough but is not: A is UNKNOWN, needs >= 14 days with adequate coverage"}
+      memory: {verdict: UNKNOWN, request_range: [0.5, 0.65], why: "same gap, A UNKNOWN"}
+
+  - name: ingest-gw
+    namespace: edge
+    team: team-edge
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.75, jitter: 0.08}
+      mem: {kind: flat, base_gib: 1.65, jitter: 0.04}
+      http: {rps: 30, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: NOOP, request_range: [1.0, 1.1], why: "EASY. Right-sized: ~0.8 core p99 x 1.3 ~ 1.05 is already about the current request"}
+      memory: {verdict: NOOP, request_range: [2.0, 2.2], why: "EASY. Max working set ~1.72 GiB x 1.2 ~ 2.06 is already about the current request"}
+
+traps:
+  - {workload: route-quote, why: "median says idle and p99 agrees, the spike is only in the extreme tail; sizing to p99 undersizes by 5x"}
+  - {workload: rate-engine, why: "a weekly peak seen only twice in 14 days: p99 and the daily pattern both miss it, but it throttles"}
+  - {workload: session-store, why: "peak working set today underestimates next week's peak: the memory is creeping, not steady"}
+  - {workload: fraud-score, why: "SLO objective is defined but the burn rate is unobservable: the third input is incomplete, not passing"}
+  - {workload: edge-gateway, why: "sidecar usage is larger than the app's: pooled per-pod usage mis-sizes the app container"}
+  - {workload: quote-cache, why: "low absolute usage looks wasteful, but usage is clipped by a limit below demand and the pod is throttled"}
+  - {workload: catalog-sync, why: "21 days between first and last sample, but 8 days in the middle are missing"}

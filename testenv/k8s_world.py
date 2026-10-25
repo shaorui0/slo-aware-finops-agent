@@ -22,8 +22,16 @@ Event types (all absolute timestamps):
   oom       {at, pod}                       working set hits the limit, container restarts, last_terminated_reason=OOMKilled
   slo_burn  {at, burn_rate, budget_remaining, ramp_hours}   burn rate and error ratio ramp up, budget runs down
 
-Profiles (per workload): cpu.kind = flat | tidal | batch; mem.kind = flat | batch | leak.
+Profiles (per workload): cpu.kind = flat | tidal | batch | weekly | spiky; mem.kind = flat | batch | leak | creep.
 `data_days` limits the samples to the last N days of the (possibly truncated) period; earlier points are None.
+
+Additive extensions (c0035, used by the pre-registered fresh world; none of them changes an existing series):
+  cpu weekly  {base, jitter, peak_dow (0=Mon), peak_hour, peak_hours, peak_value}   a short peak once a week only
+  cpu spiky   {base, jitter, spike_prob, spike_value}                               rare isolated spikes: p99 flat, p99.9 high
+  mem creep   {start_gib, slope_gib_per_day, jitter}                                monotonic rise, no reset (slow leak)
+  profile.gaps [{from, to}]                                                         samples inside become None (data gap mid-window)
+  profile.slo_metrics: false                                                        no slo_* series even though the workload has an SLO
+  workload.sidecar {name, requests, limits, cpu_base, cpu_jitter, mem_gib, mem_jitter}   a second container per pod under the same workload label
 """
 from __future__ import annotations
 
@@ -193,6 +201,7 @@ def cpu_cores(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float
     n = w["replicas"]
     spread = 1 + w["profile"].get("per_pod_spread", 0.02) * (i - (n - 1) / 2)
     rng = random.Random(f"{w['name']}:{i}:cpu")
+    spike_rng = random.Random(f"{w['name']}:{i}:spike")      # only drawn by kind=spiky
     out = []
     for t in grid:
         j = rng.uniform(-1, 1) * p.get("jitter", 0.05)
@@ -207,6 +216,12 @@ def cpu_cores(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float
         elif p["kind"] == "batch":
             on = p["start_hour"] <= h < p["start_hour"] + p["hours"]
             u = (p["active"] if on else p["idle"]) * (1 + j)
+        elif p["kind"] == "weekly":
+            dow = (int(t // 86400) + 3) % 7          # 1970-01-01 was a Thursday; 0 = Monday
+            on = dow == p["peak_dow"] and p["peak_hour"] <= h < p["peak_hour"] + p["peak_hours"]
+            u = (p["peak_value"] if on else p["base"]) * (1 + j)
+        elif p["kind"] == "spiky":
+            u = (p["spike_value"] if spike_rng.random() < p["spike_prob"] else p["base"]) * (1 + j)
         else:
             raise ValueError(p["kind"])
         out.append(max(0.0, u * spread * _load_factor(w, t)))
@@ -233,6 +248,8 @@ def mem_gib(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float]:
             cyc = p["cycle_hours"] * 3600
             ref = t_ref if (t_ref is not None and t >= t_ref) else world.t0
             v = (p["base_gib"] + (p["peak_gib"] - p["base_gib"]) * ((t - ref) % cyc) / cyc) * (1 + j)
+        elif p["kind"] == "creep":
+            v = (p["start_gib"] + p["slope_gib_per_day"] * (t - world.t0) / 86400) * (1 + j)
         else:
             raise ValueError(p["kind"])
         if oom and abs(t - t_ref) < STEP / 2:
@@ -274,6 +291,31 @@ def _slo(world: K8sWorld, w: dict, grid: list[float], thr: list[float]):
     return budget, burn, err
 
 
+def _emit_sidecar(emit, world: K8sWorld, w: dict, i: int, pod: str, grid: list[float]) -> None:
+    """A second container in every pod, same workload label, flat usage (e.g. a mesh proxy or log shipper)."""
+    sc = w["sidecar"]
+    lab = {"namespace": w["namespace"], "workload": w["name"], "container": sc["name"], "pod": pod}
+    rng = random.Random(f"{w['name']}:{i}:sidecar")
+    n = len(grid)
+    cpu = [max(0.0, sc["cpu_base"] * (1 + rng.uniform(-1, 1) * sc.get("cpu_jitter", 0.05))) for _ in grid]
+    mem = [sc["mem_gib"] * (1 + rng.uniform(-1, 1) * sc.get("mem_jitter", 0.02)) for _ in grid]
+    acc, cnt = 0.0, []
+    for u in cpu:
+        acc += u * STEP
+        cnt.append(round(acc, 3))
+    emit("container_cpu_usage_seconds_total", lab, "counter", cnt)
+    emit("container_cpu_usage_cores", lab, "gauge", [round(u, 5) for u in cpu])
+    emit("container_memory_working_set_bytes", lab, "gauge", [round(m * GIB) for m in mem])
+    emit("container_cpu_cfs_periods_total", lab, "counter", [float(PERIODS_PER_STEP * (k + 1)) for k in range(n)])
+    emit("container_cpu_cfs_throttled_periods_total", lab, "counter", [0.0] * n)
+    for res, unit, qty_unit in (("cpu", "core", "core"), ("memory", "byte", "GiB")):
+        scale = GIB if res == "memory" else 1
+        rq = parse_qty(sc["requests"][res], qty_unit) * scale
+        lm = parse_qty(sc["limits"][res], qty_unit) * scale
+        emit("kube_pod_container_resource_requests", {**lab, "resource": res, "unit": unit}, "gauge", [float(rq)] * n)
+        emit("kube_pod_container_resource_limits", {**lab, "resource": res, "unit": unit}, "gauge", [float(lm)] * n)
+
+
 def build_series(world: K8sWorld):
     """-> (grid, [(labels, kind, values)]); values align with grid, None = no sample (before data_days)."""
     grid = world.grid
@@ -282,7 +324,13 @@ def build_series(world: K8sWorld):
     for w in world.workloads:
         ns, name, cname = w["namespace"], w["name"], w["container"]["name"]
         first = max(0, int((end - w.get("data_days", 10 ** 6) * 86400 - world.t0) // STEP)) if w.get("data_days") else 0
-        mask = lambda vals: [None] * first + vals[first:]
+        gaps = [(_ts(g["from"]), _ts(g["to"])) for g in w["profile"].get("gaps", [])]
+
+        def mask(vals):
+            vals = [None] * first + vals[first:]
+            if gaps:
+                vals = [None if any(a <= t < b for a, b in gaps) else v for t, v in zip(grid, vals)]
+            return vals
         base = {"namespace": ns, "workload": name, "container": cname}
 
         def emit(metric, labels, kind, vals):
@@ -323,6 +371,8 @@ def build_series(world: K8sWorld):
             for phase in ("Running", "Pending"):
                 emit("kube_pod_status_phase", {"namespace": ns, "workload": name, "pod": pod, "phase": phase}, "gauge",
                      [1.0 if phase == "Running" else 0.0] * n)
+            if "sidecar" in w:
+                _emit_sidecar(emit, world, w, i, pod, grid)
             if "http" in w["profile"]:
                 h = w["profile"]["http"]
                 ref = w["profile"]["cpu"].get("base", 1.0)
@@ -348,7 +398,7 @@ def build_series(world: K8sWorld):
             emit("kube_horizontalpodautoscaler_spec_target_metric", {**hl, "metric_name": h["metric"], "metric_target_type": "utilization"}, "gauge", [float(h["target_utilization"])] * n)
             emit("kube_horizontalpodautoscaler_status_current_replicas", hl, "gauge", [float(w["replicas"])] * n)
             emit("kube_horizontalpodautoscaler_spec_max_replicas", hl, "gauge", [float(h["max"])] * n)
-        if "slo" in w:
+        if "slo" in w and w["profile"].get("slo_metrics", True):
             thr0 = pod_thr[0]
             budget, burn, _ = _slo(world, w, grid, thr0)
             emit("slo_error_budget_remaining_ratio", base, "gauge", [round(x, 4) for x in budget])

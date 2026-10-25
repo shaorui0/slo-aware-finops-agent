@@ -1,0 +1,17 @@
+# SLO catalog for the pre-registered fresh K8s world (c0035). Same shape as testenv/k8s_slos.yaml.
+# Targets only; the current burn comes from metrics. fraud-score is listed here but has NO slo_* metrics (by design).
+# ingest-gw etc. are defined; every workload in the fresh world has an SLO (the base world's no-slo case is not repeated).
+apiVersion: finops.local/v1
+kind: SLOCatalog
+metadata: {name: finops-k8s-fresh}
+slos:
+  - {namespace: payments, workload: ledger-api, objectives: {availability: 0.9995, p99_seconds: 0.25}}
+  - {namespace: pricing, workload: route-quote, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: pricing, workload: rate-engine, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: platform, workload: session-store, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: risk, workload: fraud-score, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: platform, workload: edge-gateway, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: pricing, workload: quote-cache, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: finance, workload: eod-reconcile, deadline_seconds: 7200}
+  - {namespace: data, workload: catalog-sync, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: edge, workload: ingest-gw, objectives: {availability: 0.999, p99_seconds: 0.3}}

@@ -1,8 +1,8 @@
 ## 1. 预注册（freeze 之前）
-- [ ] 1.1 `testenv/k8s_world.py`：只加新 profile 种类（weekly、spiky、creep、sidecar、gaps、slo_metrics 开关），旧输出不变
-- [ ] 1.2 `testenv/heldout/k8s_fresh_world.yaml` + `k8s_fresh_slos.yaml`：10 个 workload，`expect` 与 `why`
-- [ ] 1.3 `testenv/test_k8s_fresh.py`：自洽、目录一致、服务可查询、旧世界序列不变
-- [ ] 1.4 提交 freeze，记下 sha；此前不运行 agent 与评分器
+- [x] 1.1 `testenv/k8s_world.py`：只加新 profile 种类（weekly、spiky、creep、sidecar、gaps、slo_metrics 开关），旧输出不变
+- [x] 1.2 `testenv/heldout/k8s_fresh_world.yaml` + `k8s_fresh_slos.yaml`：10 个 workload，`expect` 与 `why`
+- [x] 1.3 `testenv/test_k8s_fresh.py`：自洽、目录一致、服务可查询、旧世界序列不变
+- [x] 1.4 提交 freeze，记下 sha；此前不运行 agent 与评分器
 
 ## 2. 评估（freeze 之后，一次）
 - [ ] 2.1 `eval/k8s_heldout.sh`
