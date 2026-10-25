@@ -1,0 +1,17 @@
+# SLO catalog for the second pre-registered world (c0036). Third independent input: targets only, not current burn.
+# Workloads without an SLO (admin-console) do not appear. Kept equal to the `slo` blocks of k8s_fresh2_world.yaml.
+apiVersion: finops.local/v1
+kind: SLOCatalog
+metadata: {name: finops-k8s-synth2}
+slos:
+  - {namespace: shop, workload: checkout-web, objectives: {availability: 0.999, p99_seconds: 0.4}}
+  - {namespace: analytics, workload: report-builder, objectives: {availability: 0.999, p99_seconds: 0.5}}
+  - {namespace: search, workload: search-indexer, objectives: {availability: 0.999, p99_seconds: 0.4}}
+  - {namespace: shop, workload: session-cache, objectives: {availability: 0.999, p99_seconds: 0.2}}
+  - {namespace: data, workload: ingest-worker, objectives: {availability: 0.995, p99_seconds: 1.0}}
+  - {namespace: observability, workload: edge-collector, objectives: {availability: 0.999, p99_seconds: 0.5}}
+  - {namespace: shop, workload: queue-consumer, objectives: {availability: 0.999, p99_seconds: 0.5}}
+  - {namespace: data, workload: nightly-etl, deadline_seconds: 7200}
+  - {namespace: shop, workload: pricing-engine, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: notify-svc, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: billing, workload: invoice-api, objectives: {availability: 0.999, p99_seconds: 0.4}}
