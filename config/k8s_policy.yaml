@@ -1,0 +1,26 @@
+# K8s requests 优化的全部阈值。policy.py / recommend.py / collect.py 只从这里读，代码里不写阈值。
+# 含义见 openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md。
+
+window_days: 14              # 取数窗口
+min_days: 14                 # 条件 A：有效天数下限
+min_coverage: 0.9            # 条件 A：窗口内有数据的小时占比下限
+valid_day_min_hours: 12      # 一天里至少这么多个小时有数据才算有效天
+
+cpu_headroom: 0.3            # 推荐：p99 * (1 + cpu_headroom)
+cpu_step: 0.05               # 向上取整的粒度，单位 core
+mem_headroom: 0.2            # 推荐：最大 working set * (1 + mem_headroom)
+mem_step: 64Mi               # 向上取整的粒度
+
+margin: 0.1                  # 条件 B：新 request 至少是峰值的 (1 + margin) 倍
+max_throttle: 0.05           # 条件 B：高峰期 CFS throttling 比例上限（严格小于）
+oom_guard: 0.9               # 条件 B：峰值 working set 低于 oom_guard * limit
+min_budget: 0.25             # 条件 C：剩余错误预算比例下限
+deadline_guard: 0.8          # 条件 C：批任务最长耗时不超过 deadline 的这个比例
+same_target_tolerance: 0.05  # 台账：目标值相差不超过 5% 视为同一提案（c0030 起使用）
+
+hours_per_month: 730
+pricing:                     # 默认牌价；调用方可用世界文件的 pricing 覆盖
+  node_type: m6i.xlarge
+  node_hour_usd: 0.192
+  cpu_core_hour_usd: 0.0316
+  mem_gib_hour_usd: 0.0041
