@@ -53,12 +53,21 @@ def nodes_bounds(args) -> tuple[int, int | None]:
     return lo, hi
 
 
+def pricing_from(args, policy: dict) -> dict:
+    """Node pricing: the policy's default list prices, overridden key by key by the `pricing` block of --nodes-from (a world file),
+    when it has one. Without the block the result is the default, as before c0037."""
+    pr = dict(policy["pricing"])
+    if args.nodes_from:
+        pr.update((yaml.safe_load(Path(args.nodes_from).read_text()) or {}).get("pricing") or {})
+    return pr
+
+
 def run(args) -> Path:
     policy = load_policy(args.policy)
     trace = Trace()
     prom = Prom(args.prom, trace)
     lo, hi = nodes_bounds(args)
-    facts = collect_facts(prom, policy, parse_as_of(args.as_of), min_nodes=lo, max_nodes=hi, slos=load_slos(args.slos))
+    facts = collect_facts(prom, policy, parse_as_of(args.as_of), pricing=pricing_from(args, policy), min_nodes=lo, max_nodes=hi, slos=load_slos(args.slos))
     decisions = decide(facts["facts"], facts["cluster"], policy)
     verdicts = {d["id"]: d["verdict"] for d in decisions}
 
@@ -137,7 +146,7 @@ def add_parser(sub) -> None:
     r.add_argument("--prom", default="http://127.0.0.1:9090")
     r.add_argument("--slos", required=True, help="SLO catalog (third input), e.g. testenv/k8s_slos.yaml")
     r.add_argument("--as-of", default=None, help="ISO time or epoch seconds; default the metrics source's latest point")
-    r.add_argument("--nodes-from", default=None, help="yaml with nodes.min / nodes.max (node autoscaler bounds), e.g. testenv/k8s_world.yaml")
+    r.add_argument("--nodes-from", default=None, help="yaml with nodes.min / nodes.max (node autoscaler bounds) and, if present, pricing (overrides the default list prices), e.g. testenv/k8s_world.yaml")
     r.add_argument("--min-nodes", type=int, default=None)
     r.add_argument("--max-nodes", type=int, default=None)
     r.add_argument("--policy", default=None)
