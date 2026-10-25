@@ -62,3 +62,22 @@ k8s-demo:        ## local k3d demo of the controlled-execution path (cluster fin
 
 k8s-down:        ## delete ONLY the finops-test k3d cluster
 	-k3d cluster delete finops-test
+
+# ---- K8s mainline (c0031) -------------------------------------------------------------------
+K8S_PORT ?= 19190
+K8S_RUN ?= k8s-local
+
+.PHONY: k8s-eval k8s-days
+
+k8s-eval:        ## K8s mainline: serve the synthetic k8s world, run the agent (LLM from cassettes), score against expect; fails on unsafe ALLOW, thresholds, regression or a missing cassette
+	@rm -rf runs/$(K8S_RUN); mkdir -p runs
+	@$(PY) -m testenv.metrics_server --port $(K8S_PORT) --world k8s 2>/dev/null & pid=$$!; \
+	ok=1; for i in $$(seq 1 60); do curl -sf localhost:$(K8S_PORT)/-/healthy >/dev/null && ok=0 && break; sleep 0.5; done; \
+	status=1; if [ $$ok = 0 ]; then \
+	  $(PY) -m finops_agent k8s run --prom http://127.0.0.1:$(K8S_PORT) --slos testenv/k8s_slos.yaml --nodes-from testenv/k8s_world.yaml \
+	    --run-id $(K8S_RUN) --state runs/$(K8S_RUN)/k8s_state.json --world-label k8s-synth \
+	  && $(PY) -m eval.score_k8s runs/$(K8S_RUN)/k8s_decisions.json; status=$$?; fi; \
+	{ kill $$pid; wait $$pid; } 2>/dev/null; exit $$status
+
+k8s-days:        ## three simulated days sharing one proposal ledger: new / unchanged / expired per day, day 3 on the drift scenario
+	bash scripts/k8s_days.sh

@@ -218,7 +218,8 @@ class OutputTest(unittest.TestCase):
     def test_contract_shape(self):
         d = one(make_facts())
         self.assertEqual(list(d), ["id", "workload", "namespace", "team", "resource", "current", "usage", "recommendation",
-                                   "savings", "conditions", "verdict", "reasons", "unknown_needs", "hpa_coupled", "evidence", "narrative"])
+                                   "savings", "conditions", "verdict", "reasons", "unknown_needs", "hpa_coupled", "evidence", "narrative",
+                                   "container", "slo"])   # the last two are c0031 additions
         self.assertEqual(d["id"], "K-shop-api-cpu")
         self.assertIsNone(d["narrative"])
         self.assertEqual(set(d["savings"]), {"request_value_usd_month", "realizable_usd_month", "nodes_before", "nodes_after"})

@@ -1,0 +1,7 @@
+{
+  "verdict_accuracy": 1.0,
+  "unsafe_allow": 0,
+  "unknown_recall": 1.0,
+  "request_in_range": 1.0,
+  "realizable_accuracy": 1.0
+}

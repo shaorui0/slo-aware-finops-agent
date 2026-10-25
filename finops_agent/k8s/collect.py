@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
+import yaml
+
 from finops_agent.collect import Trace
 
 # ---- metric names (contract) --------------------------------------------------
@@ -39,6 +41,21 @@ TEAM_LABEL = "team"                    # on kube_deployment_spec_replicas
 
 GIB = 1024 ** 3
 HOUR = 3600
+
+
+def load_slos(path) -> dict:
+    """SLO catalog (the third input, c0031) -> {(namespace, workload): {"objectives": {...}, "deadline_seconds": x|None}}.
+
+    A workload that is not in the catalog has no SLO. Metrics never define one (spec: Metrics / SLO / Requests are independent)."""
+    with open(path) as fh:
+        doc = yaml.safe_load(fh) or {}
+    out = {}
+    for s in doc.get("slos") or []:
+        key = (s["namespace"], s["workload"])
+        if key in out:
+            raise ValueError(f"SLO catalog lists {key[0]}/{key[1]} twice")
+        out[key] = {"objectives": dict(s.get("objectives") or {}), "deadline_seconds": s.get("deadline_seconds")}
+    return out
 
 
 class Prom:
@@ -97,13 +114,14 @@ class Evidence:
 
     def add(self, key, query, window, value):
         eid = f"E{len(self.items) + 1}"
-        self.items.append({"id": eid, "query": query, "window": window, "value": value, "source": "prometheus"})
+        source = "slo_catalog" if str(query).startswith("slo_catalog:") else "prometheus"
+        self.items.append({"id": eid, "query": query, "window": window, "value": value, "source": source})
         self.ev[key] = eid
 
 
 class Collector:
-    def __init__(self, prom: Prom, policy: dict, as_of: float | None = None):
-        self.prom, self.policy = prom, policy
+    def __init__(self, prom: Prom, policy: dict, as_of: float | None = None, slos: dict | None = None):
+        self.prom, self.policy, self.slos = prom, policy, slos
         self.days = policy["window_days"]
         self.win = f"{self.days}d"
         self.t = as_of if as_of is not None else self._probe()
@@ -190,7 +208,8 @@ class Collector:
             m[key] = (q, window, v)
             return v, labels
 
-        inst("replicas", f"max by (workload)({DEPLOY_REPLICAS}{{{sel}}})")
+        _, rl = inst("replicas", f"max by (workload, container)({DEPLOY_REPLICAS}{{{sel}}})")
+        m["container"] = rl.get("container")
         inst("oom", f'sum by (workload)(max_over_time({LAST_TERMINATED}{{{sel},reason="OOMKilled"}}[{self.win}]))', self.win)
         if m["oom"][2] is None:
             m["oom"] = (m["oom"][0], self.win, 0.0)   # no OOMKilled series = no OOM kill in the window
@@ -206,6 +225,13 @@ class Collector:
         job, jl = inst("job", f"max by (workload, {DEADLINE_LABEL})(max_over_time({JOB_DURATION}{{{sel}}}[{self.win}]))", self.win)
         deadline = _num(jl.get(DEADLINE_LABEL)) if job is not None else None
         m["deadline"] = (m["job"][0], self.win, deadline)
+        if self.slos is not None:   # catalog mode: objectives and the deadline come from the SLO catalog, not from metric labels
+            entry = self.slos.get((ns, wl))
+            ref = f"slo_catalog:{ns}/{wl}"
+            m["deadline"] = (f"{ref}.deadline_seconds", "catalog", None if entry is None else _num(entry.get("deadline_seconds")))
+            for k in ("availability", "p99_seconds"):
+                if entry is not None and entry["objectives"].get(k) is not None:
+                    m["obj_" + k] = (f"{ref}.{k}", "catalog", _num(entry["objectives"][k]))
         return m, hpa
 
     def resource_measures(self, ns, wl, resource):
@@ -255,9 +281,11 @@ class Collector:
 
 
 def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing: dict | None = None,
-                  min_nodes: int = 1, max_nodes: int | None = None) -> dict:
-    """-> {as_of, facts: [per (workload, resource) facts], cluster}. as_of is epoch seconds; default = the source's latest point."""
-    c = Collector(prom, policy, as_of)
+                  min_nodes: int = 1, max_nodes: int | None = None, slos: dict | None = None) -> dict:
+    """-> {as_of, facts: [per (workload, resource) facts], cluster}. as_of is epoch seconds; default = the source's latest point.
+
+    slos: the SLO catalog from load_slos(); None keeps the c0029 behaviour (SLO signals only from metrics)."""
+    c = Collector(prom, policy, as_of, slos)
     cluster = c.cluster(pricing or policy["pricing"], min_nodes, max_nodes)
     facts = []
     for ns, wl, team in c.workloads():
@@ -270,7 +298,7 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
             for k in order:
                 src = shared if k == "replicas" else rm
                 book.add(k, *src[k])
-            for k in ("oom", "hpa", "hpa_current", "hpa_max", "burn", "budget", "job", "deadline"):
+            for k in ("oom", "hpa", "hpa_current", "hpa_max", "burn", "budget", "job", "deadline", "obj_availability", "obj_p99_seconds"):
                 if k in shared:
                     book.add(k, *shared[k])
             for k, meas in cluster["evidence"].items():
@@ -285,8 +313,11 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
                           "throttle_peak": None if throttle is None else round(throttle, 6),
                           "oom_events": shared["oom"][2]},
                 "hpa": hpa,
+                "container": shared["container"],
                 "slo": {"burn_rate_1h": shared["burn"][2], "budget_remaining": shared["budget"][2],
                         "job_max_duration": shared["job"][2], "deadline_seconds": shared["deadline"][2]},
+                "slo_def": {"defined": None if slos is None else (ns, wl) in slos,
+                            "objectives": {k: shared["obj_" + k][2] for k in ("availability", "p99_seconds") if "obj_" + k in shared}},
                 "evidence": book.items, "ev": book.ev,
             })
     cluster = {k: v for k, v in cluster.items() if k != "evidence"}

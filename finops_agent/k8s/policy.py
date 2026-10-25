@@ -108,8 +108,16 @@ def cond_c(f, policy):
     s = f.get("slo") or {}
     burn, budget = s.get("burn_rate_1h"), s.get("budget_remaining")
     job, deadline = s.get("job_max_duration"), s.get("deadline_seconds")
-    has_slo, has_job = burn is not None or budget is not None, job is not None
-    keys = ["burn", "budget", "job", "deadline"]
+    keys = ["burn", "budget", "job", "deadline", "obj_availability", "obj_p99_seconds"]
+    sd = f.get("slo_def") or {}
+    defined = sd.get("defined")   # None = no SLO catalog given (c0029 behaviour); False = the catalog has no entry for this workload
+    if defined is False:
+        return _cond("UNKNOWN", "SLO 目录里没有该 workload 的定义，指标里的 slo_* 序列不能替代", f, keys,
+                     ["需要在 SLO 目录里为该 workload 定义 SLO（availability / p99_seconds / 批任务 deadline_seconds）"])
+    if defined:
+        has_slo, has_job = bool(sd.get("objectives")), deadline is not None
+    else:
+        has_slo, has_job = burn is not None or budget is not None, job is not None
     if not has_slo and not has_job:
         return _cond("UNKNOWN", "未定义 SLO，不能用利用率替代", f, keys,
                      ["需要为该 workload 定义 SLO（slo_error_budget_remaining_ratio、slo_burn_rate_1h 或批任务 deadline）"])
@@ -126,6 +134,8 @@ def cond_c(f, policy):
     if has_job:
         if deadline is None:
             unknowns.append(("批任务缺少 deadline", "需要批任务的 deadline_seconds"))
+        elif job is None:
+            unknowns.append(("批任务缺少耗时指标", "需要 job_last_duration_seconds"))
         elif job > policy["deadline_guard"] * deadline:
             fails.append(f"批任务最长耗时 {job:g}s > {policy['deadline_guard']:g} × deadline {deadline:g}s")
         else:
@@ -230,6 +240,8 @@ def decide_one(f, cluster, policy, base_nodes, base_pods):
         "hpa_coupled": hpa_coupled,
         "evidence": [dict(e) for e in f["evidence"]],
         "narrative": None,
+        "container": f.get("container"),   # c0031 additions (spec k8s-pipeline), after the contract fields
+        "slo": {**(f.get("slo") or {}), **(f.get("slo_def") or {})},
     })
 
 

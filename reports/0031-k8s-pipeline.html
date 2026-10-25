@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0031-k8s-pipeline</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0031-k8s-pipeline</h1>
+</header>
+<h1 id="c0031-k8s-主线串联">c0031 K8s 主线串联</h1>
+<h2 id="结论">结论</h2>
+<ul>
+<li>主线接通：SLO 目录（第三输入）→ collect → decide → 隔离 LLM 叙述 →
+提案台账 → 计划 → <code>k8s_decisions.json</code>。</li>
+<li><code>make k8s-eval</code> 对世界的 <code>expect</code> 打分：18/18
+判对，<code>unsafe_allow</code> 0，<code>unknown_recall</code>
+1.0，<code>request_in_range</code> 1.0，<code>realizable_accuracy</code>
+1.0。已进 CI，回放盒带，缺盒带即失败。</li>
+<li><code>make k8s-days</code> 三天连续运行：第 2 天 8 条 unchanged、2
+条 expired；第 3 天漂移的 api-steady cpu 提案过期并以新目标重提。</li>
+<li>附录 <code>make eval</code> 数字不变。</li>
+</ul>
+<h2 id="改了什么为什么">改了什么，为什么</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>部分</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SLO 目录</td>
+<td><code>testenv/k8s_slos.yaml</code>：每个 (namespace, workload) 的
+availability、p99_seconds 目标与批任务 deadline_seconds。没有 SLO 的
+workload 不在目录里。<code>testenv/test_k8s_slos.py</code> 断言与世界的
+<code>slo</code> 块一致</td>
+</tr>
+<tr>
+<td>collect、policy</td>
+<td>目标与 deadline 取自目录（证据
+<code>source: slo_catalog</code>）；燃烧率与剩余预算仍取自指标；workload
+不在目录里则条件 C 为 UNKNOWN，即使有 <code>slo_*</code> 指标；决策追加
+<code>container</code>、<code>slo</code></td>
+</tr>
+<tr>
+<td>条件 D</td>
+<td>以 <code>nodes.max</code> 作
+<code>max_nodes</code>，自动扩缩能为回滚补节点；未知则保持字面行为。契约文字在
+spec delta 里修订</td>
+</tr>
+<tr>
+<td>narrate</td>
+<td>每条决策一次隔离调用；数字过 <code>judge/validate.py</code>
+落地，含未取自证据数字的句子抹除；声称其他 verdict 的句子也抹除；verdict
+不变断言；失败退回模板；全部调用进 trace</td>
+</tr>
+<tr>
+<td>plans</td>
+<td>ALLOW 与 REQUIRE_APPROVAL 出契约形状的计划；停止条件由决策与 SLO
+推出</td>
+</tr>
+<tr>
+<td>ledger</td>
+<td><code>runs/k8s_state.json</code>：5% 去重、verdict 或目标变化则
+expired、applied 后 SLO 退化则 halted 并 <code>safe_halt</code></td>
+</tr>
+<tr>
+<td>评估</td>
+<td><code>eval/score_k8s.py</code>：五个指标、硬闸、叙述数字落地检查、基线回归</td>
+</tr>
+</tbody>
+</table>
+<h2 id="前后对比">前后对比</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>世界 <code>k8s</code>，同一内核</th>
+<th>判对</th>
+<th>错的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>c0029，无目录</td>
+<td>16/18</td>
+<td>batch-nightly cpu、memory：REQUIRE_APPROVAL，应为 DENY（deadline 在
+SLO 定义里，指标里没有）</td>
+</tr>
+<tr>
+<td>c0031，有目录</td>
+<td>18/18</td>
+<td>无</td>
+</tr>
+</tbody>
+</table>
+<h2 id="k3-评分">K3 评分</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+<th>阈值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>verdict_accuracy</td>
+<td>1.0</td>
+<td>≥ 0.9</td>
+</tr>
+<tr>
+<td>unsafe_allow</td>
+<td>0</td>
+<td>= 0（硬闸，非 0 退出）</td>
+</tr>
+<tr>
+<td>unknown_recall</td>
+<td>1.0</td>
+<td>= 1.0</td>
+</tr>
+<tr>
+<td>request_in_range</td>
+<td>1.0</td>
+<td>≥ 0.8</td>
+</tr>
+<tr>
+<td>realizable_accuracy</td>
+<td>1.0（2 条有 expect）</td>
+<td>只对写了区间的条目计</td>
+</tr>
+</tbody>
+</table>
+<h2 id="k4-叙述">K4 叙述</h2>
+<ul>
+<li>18 条全部来自真实 <code>claude -p</code>（sonnet）录制的盒带：回放
+trace 为 148381 输入 token、9920 输出 token、录制成本 0.6927 USD。</li>
+<li>评分对每条叙述重跑数字落地检查，未取自证据的数字为 0。</li>
+<li>1 条第一次返回的 JSON 嵌套错位，被严格解析拒绝；按设计 record
+模式下该条退回模板；删除该盒带重录后合格。</li>
+</ul>
+<h2 id="k8-三天">K8 三天</h2>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>天</th>
+<th>世界 as_of</th>
+<th>new</th>
+<th>unchanged</th>
+<th>expired</th>
+<th>发生了什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>基线 10-25</td>
+<td>10</td>
+<td>0</td>
+<td>0</td>
+<td>首批提案；burning-slo 的燃烧事件尚未发生，为 ALLOW</td>
+</tr>
+<tr>
+<td>2</td>
+<td>基线 10-26</td>
+<td>0</td>
+<td>8</td>
+<td>2</td>
+<td>burning-slo 开始烧预算，两条提案因 verdict 变 DENY 而 expired</td>
+</tr>
+<tr>
+<td>3</td>
+<td>漂移 10-28</td>
+<td>1</td>
+<td>7</td>
+<td>1</td>
+<td>api-steady 负载 +60%，cpu 目标 0.25 → 0.35（超过 5%），旧提案
+expired，新建</td>
+</tr>
+</tbody>
+</table>
+<p>applied 后 SLO 退化：单测与端到端测试都断言
+halted、<code>safe_halt</code>、无计划。</p>
+<h2 id="未决">未决</h2>
+<ul>
+<li><code>tools/test_build_index.py::test_index_lists_every_change</code>
+失败，原因是 <code>reports/index.html</code> 未收 c0029（在 c0029
+合并提交上同样失败）。导读页由主 agent 合并时重新生成。</li>
+<li>执行层（<code>act.py</code>、k3d）与定期报告不在本
+change。<code>k8s mark</code> 是执行层回写台账状态的入口。</li>
+</ul>
+<p>证据全文：<code>openspec/changes/c0031-k8s-pipeline/evidence.md</code>。</p>
+</body>
+</html>
