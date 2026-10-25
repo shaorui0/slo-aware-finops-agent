@@ -53,3 +53,11 @@
 ### Requirement: 确定性
 
 同样的 facts、cluster、policy 输入，`decide` 输出的 JSON 字符串逐字节相同。decision 按 `id` 排序；浮点数统一四舍五入到 6 位。
+
+### Requirement: 判定顺序（主 agent 修订，覆盖 c0027 原文）
+
+1. C = FAIL → DENY；2. A ≠ PASS → UNKNOWN；3. B = FAIL 或 D = FAIL → DENY；4. 推荐值不低于当前值 → NOOP；5. 任一条件 UNKNOWN 或 HPA 联动 → REQUIRE_APPROVAL；6. ALLOW。B 的风险判据（窗口内 OOMKilled、峰值 working set ≥ oom_guard × limit、高峰 throttling ≥ max_throttle）在当前状态上评估，即使没有降配建议。
+
+#### Scenario: 欠配的 workload
+- **WHEN** 推荐值 ≥ 当前值，且窗口内有 OOMKilled
+- **THEN** verdict 为 DENY，reasons 写明偏低、不应降配，并给出推荐值供人工考虑上调

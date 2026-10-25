@@ -160,16 +160,16 @@ def cond_d(f, rec, cluster, base_pods, sav, policy):
 
 # ---- verdict ----------------------------------------------------------------
 def verdict_of(noop, conds, hpa_coupled):
-    """The six-step order, first match wins."""
+    """The six-step order, first match wins. NOOP sits after B/D so risk guards fire on the current state too."""
     st = {k: v["status"] for k, v in conds.items()}
-    if noop:
-        return "NOOP"
     if st["C"] == "FAIL":
         return "DENY"
     if st["A"] != "PASS":
         return "UNKNOWN"
     if st["B"] == "FAIL" or st["D"] == "FAIL":
         return "DENY"
+    if noop:
+        return "NOOP"
     if "UNKNOWN" in st.values() or hpa_coupled:
         return "REQUIRE_APPROVAL"
     return "ALLOW"
@@ -181,7 +181,11 @@ def _reasons(verdict, conds, rec, cur, hpa_coupled):
     if verdict == "DENY":
         bad = ["C"] if conds["C"]["status"] == "FAIL" else [k for k in "BD" if conds[k]["status"] == "FAIL"]
         head = "服务正在退化，冻结优化" if bad == ["C"] else "降配后风险或回滚能力不满足"
-        return [head] + [f"条件 {k}：{conds[k]['why']}" for k in bad]
+        out = [head] + [f"条件 {k}：{conds[k]['why']}" for k in bad]
+        if bad != ["C"] and is_noop(rec, cur.get("request")):
+            out = ["当前配置偏低（under-provisioned），不应降配"] + out[1:] + [
+                f"推荐值 {rec['request']:g} 高于当前值 {cur['request']:g}，仅供人工考虑上调，本 agent 不出降配计划"]
+        return out
     if verdict == "UNKNOWN":
         return ["数据不足，不能判定"] + [f"条件 {k}：{conds[k]['why']}" for k in "A" if conds[k]["status"] == "UNKNOWN"]
     if verdict == "REQUIRE_APPROVAL":

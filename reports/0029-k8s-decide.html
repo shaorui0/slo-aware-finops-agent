@@ -180,7 +180,7 @@
 取数、facts、推荐器、装箱节省、策略引擎（条件
 A–D、六步判定顺序）、<code>k8s_decisions.json</code> 写出。LLM 不参与
 verdict，narrative 恒为 null。</li>
-<li>DoD K2 的验证命令通过：<code>finops_agent/k8s</code> 下 50
+<li>DoD K2 的验证命令通过：<code>finops_agent/k8s</code> 下 51
 个单测全过；全仓 210
 个单测全过（含原有测试）；<code>check_rules --docs</code> 通过。</li>
 <li>有一处契约歧义需要维护者拍板：条件 D
@@ -245,21 +245,21 @@ pod) 打破；两种节省口径</td>
 </thead>
 <tbody>
 <tr>
-<td>1 推荐不低于当前 → NOOP</td>
-<td><code>test_1_noop_when_recommendation_not_lower</code>（含 C FAIL
-时仍为 NOOP）</td>
-</tr>
-<tr>
-<td>2 C FAIL → DENY</td>
+<td>1 C FAIL → DENY</td>
 <td><code>test_2_c_fail_beats_a_unknown</code>、<code>test_c_fail_low_budget_and_batch_deadline</code></td>
 </tr>
 <tr>
-<td>3 A 不为 PASS → UNKNOWN</td>
+<td>2 A 不为 PASS → UNKNOWN</td>
 <td><code>test_3_a_unknown_gives_unknown_with_needs</code>、<code>test_3_a_unknown_beats_b_fail</code></td>
 </tr>
 <tr>
-<td>4 B 或 D FAIL → DENY</td>
-<td>throttling、Pending、OOMKilled、贴近 limit</td>
+<td>3 B 或 D FAIL → DENY</td>
+<td>throttling、Pending、OOMKilled、贴近 limit；推荐不低于当前时 B
+的风险判据仍在当前状态上生效（<code>test_3_noop_but_current_state_unsafe_is_deny</code>）</td>
+</tr>
+<tr>
+<td>4 推荐不低于当前 → NOOP</td>
+<td><code>test_1_noop_when_recommendation_not_lower</code></td>
 </tr>
 <tr>
 <td>5 UNKNOWN 或 HPA 联动 → REQUIRE_APPROVAL</td>
@@ -306,7 +306,7 @@ CPU 使用量 gauge，因为 PromQL
 <li><code>python3 -W ignore -m unittest discover -t . -s finops_agent -p 'test_*.py'</code>：Ran
 210 tests，OK</li>
 <li><code>python3 -W ignore -m unittest discover -t . -s finops_agent/k8s -p 'test_*.py'</code>：Ran
-50 tests，OK</li>
+51 tests，OK</li>
 <li><code>python3 tools/check_rules.py --docs</code>：OK</li>
 </ul>
 </body>

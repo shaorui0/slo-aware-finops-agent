@@ -57,9 +57,24 @@ class VerdictOrderTest(unittest.TestCase):
         d = one(make_facts(request=0.6))
         self.assertEqual(d["verdict"], "NOOP")
         self.assertEqual(d["savings"]["request_value_usd_month"], 0)
-        # NOOP wins even over C FAIL (rule 1 is first)
+        # C FAIL (rule 1) and A UNKNOWN (rule 2) come before NOOP
         d = one(make_facts(request=0.6, slo={"burn_rate_1h": 5, "budget_remaining": 0.01}))
-        self.assertEqual(d["verdict"], "NOOP")
+        self.assertEqual(d["verdict"], "DENY")
+        d = one(make_facts(request=0.6, usage={"valid_days": 3}))
+        self.assertEqual(d["verdict"], "UNKNOWN")
+
+    def test_3_noop_but_current_state_unsafe_is_deny(self):
+        # recommendation (2.4375) >= current (2.0) but OOMKilled in window: DENY, under-provisioned, raise for a human
+        d = one(make_facts("memory", request=2.0, usage={"oom_events": 1}))
+        self.assertEqual((d["conditions"]["B"]["status"], d["verdict"]), ("FAIL", "DENY"))
+        self.assertTrue(any("under-provisioned" in r for r in d["reasons"]))
+        self.assertTrue(any("2.4375" in r for r in d["reasons"]))
+        # same for CPU throttling at the current request
+        d = one(make_facts(request=0.6, usage={"throttle_peak": 0.1}))
+        self.assertEqual(d["verdict"], "DENY")
+        # peak working set near the limit, no reduction proposed
+        d = one(make_facts("memory", request=2.0, limit=2.1, usage={"max": 2.0}))
+        self.assertEqual(d["verdict"], "DENY")
 
     def test_2_c_fail_beats_a_unknown(self):
         f = make_facts(usage={"valid_days": 5, "coverage": 0.3}, slo={"burn_rate_1h": 3.0, "budget_remaining": 0.8})
@@ -180,6 +195,10 @@ class VerdictOrderTest(unittest.TestCase):
         P, F, U = "PASS", "FAIL", "UNKNOWN"
         cases = [
             (True, dict(A=P, B=P, C=P, D=P), False, "NOOP"),
+            (True, dict(A=P, B=F, C=P, D=P), False, "DENY"),
+            (True, dict(A=U, B=P, C=P, D=P), False, "UNKNOWN"),
+            (True, dict(A=P, B=P, C=F, D=P), False, "DENY"),
+            (True, dict(A=P, B=U, C=P, D=P), False, "NOOP"),
             (False, dict(A=P, B=P, C=F, D=P), False, "DENY"),
             (False, dict(A=U, B=P, C=P, D=P), False, "UNKNOWN"),
             (False, dict(A=U, B=F, C=P, D=P), False, "UNKNOWN"),

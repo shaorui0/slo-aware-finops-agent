@@ -3,7 +3,7 @@
 ## 全量单测（含原有测试）
 ```
 $ python3 -W ignore -m unittest discover -t . -s finops_agent -p 'test_*.py'
-Ran 210 tests in 21.835s
+Ran 211 tests in 21.747s
 OK
 ```
 
@@ -42,6 +42,7 @@ test_1_noop_when_recommendation_not_lower (finops_agent.k8s.test_policy.VerdictO
 test_2_c_fail_beats_a_unknown (finops_agent.k8s.test_policy.VerdictOrderTest.test_2_c_fail_beats_a_unknown) ... ok
 test_3_a_unknown_beats_b_fail (finops_agent.k8s.test_policy.VerdictOrderTest.test_3_a_unknown_beats_b_fail) ... ok
 test_3_a_unknown_gives_unknown_with_needs (finops_agent.k8s.test_policy.VerdictOrderTest.test_3_a_unknown_gives_unknown_with_needs) ... ok
+test_3_noop_but_current_state_unsafe_is_deny (finops_agent.k8s.test_policy.VerdictOrderTest.test_3_noop_but_current_state_unsafe_is_deny) ... ok
 test_4_b_fail_pending_pods (finops_agent.k8s.test_policy.VerdictOrderTest.test_4_b_fail_pending_pods) ... ok
 test_4_b_fail_throttling (finops_agent.k8s.test_policy.VerdictOrderTest.test_4_b_fail_throttling) ... ok
 test_4_memory_oom_denied_while_cpu_allowed_on_same_workload (finops_agent.k8s.test_policy.VerdictOrderTest.test_4_memory_oom_denied_while_cpu_allowed_on_same_workload) ... ok
@@ -62,7 +63,7 @@ test_missing_usage_gives_none (finops_agent.k8s.test_recommend.RecommendTest.tes
 test_noop_when_not_below_current (finops_agent.k8s.test_recommend.RecommendTest.test_noop_when_not_below_current) ... ok
 
 ----------------------------------------------------------------------
-Ran 50 tests in 0.586s
+Ran 51 tests in 0.553s
 
 OK
 ```
@@ -71,92 +72,4 @@ OK
 ```
 $ python3 tools/check_rules.py --docs
 check_rules: OK
-```
-
-## 样例：桩 Prometheus -> collect -> decide 的一条决策（节选）
-```
-$ python3 -c "...collect_facts + decide on the test stub..."
-K-shop-api-cpu ALLOW A/B/C/D = PASS/PASS/PASS/PASS rec = 0.65 {'request_value_usd_month': 62.2836, 'realizable_usd_month': 140.16, 'nodes_before': 3, 'nodes_after': 2}
-K-shop-api-memory ALLOW A/B/C/D = PASS/PASS/PASS/PASS rec = 2.4375 {'request_value_usd_month': 9.353125, 'realizable_usd_month': 0.0, 'nodes_before': 3, 'nodes_after': 3}
-K-shop-web-cpu UNKNOWN A/B/C/D = UNKNOWN/PASS/PASS/PASS rec = 0.4 {'request_value_usd_month': 41.5224, 'realizable_usd_month': 140.16, 'nodes_before': 3, 'nodes_after': 2}
-K-shop-web-memory UNKNOWN A/B/C/D = UNKNOWN/FAIL/PASS/PASS rec = 1.0 {'request_value_usd_month': 8.979, 'realizable_usd_month': 0.0, 'nodes_before': 3, 'nodes_after': 3}
-{
- "verdict": "UNKNOWN",
- "reasons": [
-  "数据不足，不能判定",
-  "条件 A：有效天数 5 不足 14；样本覆盖率 0.36 低于 0.90"
- ],
- "unknown_needs": [
-  "需要至少 14 天的 CPU 使用数据（当前 5 天）",
-  "需要样本覆盖率至少 0.90（当前 0.36）"
- ],
- "hpa_coupled": true
-}
-{
- "conditions": {
-  "A": {
-   "status": "PASS",
-   "why": "有效天数 14 ≥ 14，样本覆盖率 1.00 ≥ 0.90",
-   "evidence": [
-    "E8",
-    "E9",
-    "E6"
-   ]
-  },
-  "B": {
-   "status": "PASS",
-   "why": "推荐 ≥ p99 × (1+0.1)，高峰期 throttling 0.010 < 0.05，集群无 Pending",
-   "evidence": [
-    "E6",
-    "E11",
-    "E18"
-   ]
-  },
-  "C": {
-   "status": "PASS",
-   "why": "燃烧率 0.5 ≤ 1，剩余预算 0.8 ≥ 0.25",
-   "evidence": [
-    "E14",
-    "E15",
-    "E16",
-    "E17"
-   ]
-  },
-  "D": {
-   "status": "PASS",
-   "why": "有变更前快照与回滚命令；缩容后空闲 3.30 core ≥ 回滚所需 2.70 core",
-   "evidence": [
-    "E1",
-    "E3",
-    "E20",
-    "E21",
-    "E19",
-    "E22"
-   ]
-  }
- },
- "evidence[:3]": [
-  {
-   "id": "E1",
-   "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"api\",resource=\"cpu\"})",
-   "window": "instant",
-   "value": 2.0,
-   "source": "prometheus"
-  },
-  {
-   "id": "E2",
-   "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"api\",resource=\"cpu\"})",
-   "window": "instant",
-   "value": 4.0,
-   "source": "prometheus"
-  },
-  {
-   "id": "E3",
-   "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api\"})",
-   "window": "instant",
-   "value": 2.0,
-   "source": "prometheus"
-  }
- ]
-}
 ```
