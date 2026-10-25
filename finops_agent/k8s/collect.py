@@ -264,7 +264,7 @@ class Collector:
 
     def resource_measures(self, ns, wl, resource, container=None):
         # a sidecar shares the workload label: once the application container is known, every per-container selector is pinned to it
-        sel = f'namespace="{ns}",workload="{wl}"' + (f',container="{container}"' if container else "")
+        sel = f'container="{container}",namespace="{ns}",workload="{wl}"' if container else f'namespace="{ns}",workload="{wl}"'   # kube-state label order
         cpu = resource == "cpu"
         metric, scale = (CPU_USAGE, 1.0) if cpu else (MEM_WS, 1 / GIB)
         m = {}
@@ -312,15 +312,16 @@ class Collector:
             tr = daily_trend({ts: v * scale for ts, v in series.items()}, self.t - self.days * 86400, self.days, pol["valid_day_min_hours"],
                              pol["trend_min_points"], pol["trend_horizon_days"])
             if tr is not None:
-                # the evidence "query" is descriptive (the data is the hourly query above, reduced to per-day maxima), kept apart from
-                # the real PromQL so that it is not mistaken for another usage statistic
-                dq = f"ols_slope_per_day(daily_max({metric}{{{sel}}}))"
-                m["trend_slope"] = (dq, f"{self.days}d@1d", round(tr["slope"], 6))
-                m["trend_proj"] = (f"ols_projection(daily_max({metric}{{{sel}}}), +{pol['trend_horizon_days']:g}d)",
-                                   f"{self.days}d@1d+{pol['trend_horizon_days']:g}d", round(tr["projected"], 6))
                 trend = {k: (round(v, 6) if isinstance(v, float) else v) for k, v in tr.items()}
                 trend["triggered"] = (tr["slope"] > 0 and tr["r2"] >= pol["trend_min_r2"]
                                       and tr["rise"] >= pol["trend_min_rise"] * max(tr["fit_start"], 0.0))
+                if trend["triggered"]:
+                    # evidence only when the trend is a factor in the decision (like the job rows, which only a batch job has).
+                    # The "query" is descriptive (the data is the hourly query above, reduced to per-day maxima) and kept apart
+                    # from the real PromQL so that it is not mistaken for another usage statistic.
+                    m["trend_slope"] = (f"ols_slope_per_day(daily_max({metric}{{{sel}}}))", f"{self.days}d@1d", round(tr["slope"], 6))
+                    m["trend_proj"] = (f"ols_projection(daily_max({metric}{{{sel}}}), +{pol['trend_horizon_days']:g}d)",
+                                       f"{self.days}d@1d+{pol['trend_horizon_days']:g}d", round(tr["projected"], 6))
         return m, valid_days, coverage, peak, throttle, trend
 
 

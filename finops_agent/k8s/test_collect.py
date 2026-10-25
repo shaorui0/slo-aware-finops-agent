@@ -319,6 +319,7 @@ class TrendCollectTest(unittest.TestCase):
         out = collect_with(trend_fetch(ramp(0.0)))
         f = pick(out, "api", "memory")
         self.assertFalse(f["usage"]["trend"]["triggered"])
+        self.assertNotIn("trend_slope", f["ev"])          # evidence only when the trend is a factor
         d = next(x for x in decide(out["facts"], out["cluster"], POLICY) if x["id"] == "K-shop-api-memory")
         self.assertEqual(d["conditions"]["B"]["status"], "PASS")
 

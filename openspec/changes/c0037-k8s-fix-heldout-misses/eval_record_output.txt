@@ -1,0 +1,5 @@
+k8s run k8s-fresh (as_of 2026-10-24T23:55:00Z): 20 decisions {'ALLOW': 11, 'DENY': 3, 'NOOP': 2, 'REQUIRE_APPROVAL': 2, 'UNKNOWN': 2}, plans 13, ledger {'new': 13, 'unchanged': 0, 'expired': 0, 'halted': 0, 'approved': 0, 'suppressed': 0, 'held': 0}, narrative {'llm': 20}
+runs/k8s-fresh/k8s_decisions.json
+GATE FAILED: request_in_range 0.9231 is worse than baseline 1.0
+{"verdict_accuracy": 1.0, "unsafe_allow": 0, "unknown_recall": 1.0, "request_in_range": 0.9231, "realizable_accuracy": 1.0}
+n={'expected': 20, 'decisions': 20, 'unknown_expected': 2, 'ranged': 13, 'realizable': 3} narrative={'llm': 20}
