@@ -4,6 +4,27 @@
 
 状态含义：完成，表示判据已满足且主 agent 在合并后的主干上重新验证过；待定，表示还差一步，原因写在表后。
 
+## 主线 k8s-depth：SLO-aware 的 CPU/Memory requests
+
+项目在 c0027 改名为 SLO-aware FinOps Agent，主线收窄到 K8s CPU/Memory requests。接口契约见 [`openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md`](../openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md)。下表是主线的停机判据。原来的 D1–D20 衡量的是广度扫描，现在冻结为附录，见本页后半部分。
+
+| 编号 | 断言 | 状态 | 验证命令 |
+|---|---|---|---|
+| K1 | 合成 K8s 世界至少覆盖九类 case（稳态、潮汐、批窗口、近 OOM、烧预算、数据不足、无 SLO、HPA 联动、装箱陷阱），test-metrics-server 的 `--world k8s` 提供契约里的全部指标 | 待定 | `python3 -m unittest testenv.test_k8s_world`；对契约指标逐个查 `/api/v1/series`，每个都非空 |
+| K2 | 推荐器与策略引擎是确定性的，判定顺序的每一条规则都有单测；UNKNOWN 不会被当成通过 | 待定 | `python3 -m unittest discover -t . -s finops_agent/k8s -p 'test_*.py'` |
+| K3 | 端到端评估：verdict_accuracy ≥ 0.9，unsafe_allow = 0，unknown_recall = 1.0，request_in_range ≥ 0.8；CI 必跑 | 待定 | `make k8s-eval` 的输出，以及 GitHub Actions 的结果 |
+| K4 | 判断层给每条决策写解释和提案：数字全部落地（未落地数为 0），verdict 不由 LLM 决定；CI 无 key 时走回放 | 待定 | 单测断言 narrative 未落地数为 0、verdict 与策略引擎一致；trace 中 `mode=replay` |
+| K5 | 日报、周报、月报是中文：日报每张卡片有六段，有摘要、和上次的差异、被拒清单；周报有预测与实际；月报有 agent 自身质量 | 待定 | 脚本断言小标题计数 |
+| K6 | k3d 闭环：未批准不执行，context 不对不执行，状态漂移不执行；命中停止条件自动回滚并验证；成功路径执行并验证 | 待定 | `make k8s-demo` 的日志，含 rollout status |
+| K7 | 项目 hook 拦截 `k3d-finops-test` 以外任何 context 上的 kubectl 写操作，以及缺少 `# INTENT:` 的写操作 | 待定 | `python3 -m unittest discover -s hooks -p 'test_*.py'` |
+| K8 | 持续运行：模拟连续三天，重复运行不新增提案，指标漂移后提案 expired，SLO 退化触发 safe_halt | 待定 | 单测加 `make k8s-days` 的输出 |
+| K9 | 节省核实：装箱陷阱的 realizable 为 0，原因写清；至少一条实现率不为 100%，偏差原因被正确归类 | 待定 | 单测加生成的核实文档 |
+| K10 | 预注册 K8s 新世界：冻结的 commit 早于首次评估的 commit，结果原样写进 EXPERIMENTS | 待定 | `git log` 的顺序，加 `eval/EXPERIMENTS.md` 对应一节 |
+| K11 | 叙事以主线为标题：README、NARRATIVE、主页页面都以主线开头，附录明确标注 | 待定 | `make check`（含 `--docs`），加 grep 标题 |
+| K12 | 不懂这个项目的人读一份日报，不看代码，能回答「改什么、凭什么、怎么回滚、做完什么样」 | 待定 | 人读，由维护者确认 |
+
+## 附录：广度扫描的 DoD（冻结）
+
 | 编号 | 断言 | 状态 | 证据 | 验证命令 |
 |---|---|---|---|---|
 | D1 | 判断层回答线索：深层 recall 不低于 0.8，savings_recall 不低于 0.7，陷阱违规为 0 | 完成（样本内，见 D20） | [`openspec/changes/c0009-judgment-layer/evidence.md`](../openspec/changes/c0009-judgment-layer/evidence.md) | `make eval`，输出 recall 1.0、savings_recall 1.0、深层 1.0、`gates: pass` |

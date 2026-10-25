@@ -1,8 +1,26 @@
-# finops-agent：带证据找云上浪费的 AWS FinOps agent
+# SLO-aware FinOps Agent：以 SLO 为硬约束的成本优化 agent
 
-一个带证据找云上浪费的 AWS FinOps agent，同时也是一份用 spec、评估和护栏构建 LLM agent 的完整样例。
+在服务 SLO、容量安全和变更策略的约束下，持续发现、验证并兑现可归因的云成本节省。主线只做一件事：K8s workload 的 CPU/Memory requests。成本来自 AWS 节点价格，所以它仍然是 AWS FinOps，只是做深一项，不铺开。
 
-分两部分。**第一部分**是 FinOps：领域模型，以及我做成本优化的方法。**第二部分**是 agent：它怎么设计，背后的原则是什么。FinOps 是载体，第二部分才是重点。
+它同时是一份用 spec、评估和护栏构建 LLM agent 的完整样例。
+
+## 核心原则：三者不能互相替代
+
+- **Metrics** 描述资源实际发生了什么。
+- **SLO** 描述业务允许发生什么。
+- **Requests** 描述调度器应为工作负载预留多少资源。
+
+平均利用率低不等于可以降配；SLO 现在达标也不等于容量安全。agent 对每条候选变更分别检查四个条件：A 数据足够、B 资源余量、C 服务健康、D 可恢复。每个条件给出 PASS、FAIL 或 UNKNOWN，再由确定性的策略引擎判 ALLOW / REQUIRE_APPROVAL / DENY / UNKNOWN。缺数据就是 UNKNOWN，永远不当成通过；LLM 只负责解释和写提案，不参与判定。完整契约见 [`openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md`](openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md)。
+
+## AWS 已经做了什么，这里补什么
+
+Cost Optimization Hub 和 Compute Optimizer 已经能找出闲置和过配，也能估出潜在节省。这里不和它们比谁算规格更准，补的是三样东西：
+
+- **额外的上下文**：服务的 SLO、错误预算、批任务窗口、HPA 联动、节点装箱。
+- **专门的决策逻辑**：什么时候能动，什么时候必须拒绝，缺什么数据才能判。
+- **可验证的执行闭环**：人批准之后，只在本地 k3d 集群上 canary 执行，命中停止条件就回滚；执行后核对节点数是否真的降了，requests 降了不等于省了钱。
+
+> 下文「第一部分」「第二部分」里关于 12 类 AWS 浪费的内容是早期的广度扫描，现在冻结为附录：代码和 `make eval` 仍然可以跑，但不再是主线指标。
 
 ```bash
 pip install -r requirements.txt

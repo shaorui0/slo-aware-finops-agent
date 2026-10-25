@@ -2,7 +2,7 @@
 
 这一页给面试官和评审。每条能力声明只有三样东西：一句话的主张、能点开核对的证据、诚实的边界。证据都在仓库里，命令可复现；边界写在主张旁边，不放到附录里。
 
-先说定位。我做的是 agent 的工程：决定它能碰什么、被告知什么、输出怎么检查、怎样变好而不倒退。FinOps 是载体，因为成本问题每家公司都有，数据是结构化的，答错有实际代价。完整的需求和取舍见 [`REQUIREMENTS.md`](REQUIREMENTS.md)，模块与数据流见 [`ARCHITECTURE.md`](ARCHITECTURE.md)，各项能力的完成度见 [`MATURITY.md`](MATURITY.md)，构建过程见 [`BUILD_PROCESS.md`](BUILD_PROCESS.md)。
+先说定位。项目叫 SLO-aware FinOps Agent，主线只做一件事：在 SLO 和容量约束下优化 K8s workload 的 CPU/Memory requests，人批准后在测试集群执行并核实节省（见 [`MATURITY.md`](MATURITY.md) 的主线一节）。下面十二项能力的证据大多来自更早的广度扫描（12 类 AWS 浪费），那部分现已冻结为附录。我做的是 agent 的工程：决定它能碰什么、被告知什么、输出怎么检查、怎样变好而不倒退。FinOps 是载体，因为成本问题每家公司都有，数据是结构化的，答错有实际代价。完整的需求和取舍见 [`REQUIREMENTS.md`](REQUIREMENTS.md)，模块与数据流见 [`ARCHITECTURE.md`](ARCHITECTURE.md)，各项能力的完成度见 [`MATURITY.md`](MATURITY.md)，构建过程见 [`BUILD_PROCESS.md`](BUILD_PROCESS.md)。
 
 ## 十二项能力声明
 
