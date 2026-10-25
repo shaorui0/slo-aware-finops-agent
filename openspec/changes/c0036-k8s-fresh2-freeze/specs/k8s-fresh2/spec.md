@@ -9,7 +9,7 @@
 `testenv/heldout/k8s_fresh2_world.yaml` 与 `testenv/heldout/k8s_fresh2_slos.yaml` 在修复落地前冻结，之后只评一次。
 
 - 8 到 12 个 workload，名字与基础世界不重复。
-- 节点类型与单价不同于基础世界；`nodes.count` 等于对当前 requests 做 first-fit decreasing 的结果。
+- 节点类型与单价不同于基础世界；`nodes.count` 等于对当前 requests（含 sidecar）按内存降序、再按 cpu 降序做 first-fit decreasing 的结果；不同排序键的结果可能差 1，测试只固定这一种。
 - 每个 workload 的 `expect` 含 cpu 与 memory，各有 verdict、`request_range`、一行 `why`。
 - `request_range` 服从契约公式；与 SRE 判断冲突的条目标 `judgment_conflict: true`，并在 `why` 里写出分歧。
 - 至少 4 个 workload 属于自动推荐器难以处理的情形。

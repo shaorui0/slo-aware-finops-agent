@@ -12,7 +12,7 @@
 4. 每条 `expect` 来自 SRE 领域判断加契约明文规则。契约公式（cpu = p99 x 1.3 向上取 0.05，memory = 最大 working set x 1.2 向上取 64Mi）与判断冲突时，`request_range` 服从契约，在 `why` 里写明分歧，并标 `judgment_conflict: true`。
 5. 世界冻结后不再改动。修复后只评一次，结果原样记录，不回头改 expect。
 
-作者在盲写开始后做过一次越线的无意接触：`git log --oneline` 的提交标题里带有 c0035 的一行评估汇总指标（verdict_accuracy 与 unsafe_allow 的聚合数字）。没有看到是哪些 workload 失败，也没有打开对应文件。这一点在验收里如实记录。
+作者在盲写开始后做过一次越线的无意接触：`git log --oneline` 的提交标题里带有 c0035 的一行评估汇总指标（verdict_accuracy 与 unsafe_allow 的聚合数字）。没有看到是哪些 workload 失败，也没有打开对应文件。该行是在设计 workload 之前看到的。这一点在验收里如实记录。
 
 ## What Changes
 
