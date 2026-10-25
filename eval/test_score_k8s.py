@@ -63,6 +63,17 @@ class ScoreTest(unittest.TestCase):
         del w["workloads"][0]["expect"]["cpu"]["realizable_usd_month"]
         self.assertIsNone(S.score(perfect(), w)["realizable_accuracy"])
 
+    def test_ungrounded_number_in_a_narrative_fails_the_gate(self):
+        d = perfect()
+        for x in d["decisions"]:
+            x.update(current={"request": 1.0}, usage={}, conditions={}, reasons=[], unknown_needs=[], evidence=[], savings={"realizable_usd_month": 120.0})
+            x["narrative"] = {"source": "llm", "why": {"status": "request 为 1.0。", "evidence": "e", "conclusion": "c"}, "would_change": ["w"], "proposal": None}
+        self.assertEqual(S.score(d, WORLD)["narrative_ungrounded"], [])
+        d["decisions"][0]["narrative"]["why"]["evidence"] = "预计节省 98765 USD。"
+        s = S.score(d, WORLD)
+        self.assertEqual(s["narrative_ungrounded"][0]["numbers"], ["98765"])
+        self.assertTrue(any("ungrounded" in f for f in S.gates(s, None)))
+
     def test_missing_decision_counts_as_wrong(self):
         d = perfect()
         d["decisions"].pop()

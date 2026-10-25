@@ -9,10 +9,11 @@ Metrics (contract: k8s-mainline spec, section Evaluation)
   unknown_recall       share of expect-UNKNOWN entries judged UNKNOWN
   request_in_range     ALLOW / REQUIRE_APPROVAL recommendations inside expect.request_range
   realizable_accuracy  only where expect has realizable_usd_month [lo, hi]; None when no entry has it
-Informational: narrative sources (how many decisions carry an LLM narrative).
+Narrative check (hard gate, K4): every number in every narrative must be grounded in its own decision (judge/validate.py rules),
+so `narrative_ungrounded` must be 0. Informational: narrative sources (how many decisions carry an LLM narrative).
 
 Exit 1 when a gate fails: unsafe_allow > 0, verdict_accuracy < 0.9, unknown_recall < 1.0, request_in_range < 0.8,
-or any metric is worse than eval/k8s_baseline.json.
+any ungrounded number in a narrative, or any metric is worse than eval/k8s_baseline.json.
 """
 from __future__ import annotations
 
@@ -24,6 +25,9 @@ from pathlib import Path
 
 import yaml
 
+from finops_agent.judge import validate
+from finops_agent.k8s import narrate
+
 ROOT = Path(__file__).resolve().parent.parent
 MIN_VERDICT_ACCURACY, MIN_UNKNOWN_RECALL, MIN_IN_RANGE = 0.9, 1.0, 0.8
 METRICS = ("verdict_accuracy", "unsafe_allow", "unknown_recall", "request_in_range", "realizable_accuracy")
@@ -32,6 +36,19 @@ EPS = 0.01
 
 def _rate(n, d):
     return round(n / d, 4) if d else None
+
+
+def ungrounded_in_narratives(decisions: list[dict]) -> list[dict]:
+    out = []
+    for d in decisions:
+        n = d.get("narrative")
+        if not n or "why" not in n:
+            continue
+        text = " ".join(n["why"].values()) + " " + " ".join(n["would_change"]) + " " + (n.get("proposal") or "")
+        bad = validate.ungrounded_numbers(text, narrate.grounding_brief(d))
+        if bad:
+            out.append({"id": d["id"], "numbers": bad})
+    return out
 
 
 def score(doc: dict, world: dict) -> dict:
@@ -75,6 +92,7 @@ def score(doc: dict, world: dict) -> dict:
         "n": {"expected": len(expect), "decisions": len(got), "unknown_expected": unknown_total, "ranged": rng_total, "realizable": rz_total},
         "wrong_verdicts": wrong, "unsafe_allow_ids": unsafe, "out_of_range": rng_bad, "realizable_misses": rz_bad,
         "not_in_world": [f"{k[1]}/{k[2]}" for k in extra],
+        "narrative_ungrounded": ungrounded_in_narratives(doc["decisions"]),
         "narrative_sources": dict(sorted(Counter((d.get("narrative") or {}).get("source", "none") for d in doc["decisions"]).items())),
     }
 
@@ -89,6 +107,8 @@ def gates(s: dict, baseline: dict | None) -> list[str]:
         fails.append(f"unknown_recall {s['unknown_recall']} < {MIN_UNKNOWN_RECALL}")
     if s["request_in_range"] is not None and s["request_in_range"] < MIN_IN_RANGE:
         fails.append(f"request_in_range {s['request_in_range']} < {MIN_IN_RANGE}: {s['out_of_range']}")
+    if s["narrative_ungrounded"]:
+        fails.append(f"ungrounded numbers in narratives: {s['narrative_ungrounded']}")
     if baseline:
         for k in METRICS:
             b, v = baseline.get(k), s[k]
