@@ -81,3 +81,9 @@ k8s-eval:        ## K8s mainline: serve the synthetic k8s world, run the agent (
 
 k8s-days:        ## three simulated days sharing one proposal ledger: new / unchanged / expired per day, day 3 on the drift scenario
 	bash scripts/k8s_days.sh
+
+# ---- K8s savings verification (c0033) ---------------------------------------------------------
+.PHONY: k8s-verify
+
+k8s-verify:      ## verify applied K8s request changes against the after-scenarios: runs/k8s-verify/k8s_verify.json (contract shape) and docs/K8S_SAVINGS_VERIFICATION.md
+	bash scripts/k8s_verify.sh
