@@ -1,6 +1,6 @@
 {
   "as_of": "2026-10-26T00:00:00Z",
-  "world": "testenv/k8s_world.yaml",
+  "world": "k8s-synth",
   "decisions": [
     {
       "id": "K-data-batch-nightly-cpu",
@@ -60,8 +60,8 @@
           ]
         },
         "C": {
-          "status": "UNKNOWN",
-          "why": "批任务缺少 deadline",
+          "status": "FAIL",
+          "why": "批任务最长耗时 6922.3s > 0.8 × deadline 7200s",
           "evidence": [
             "E14",
             "E15",
@@ -82,13 +82,12 @@
           ]
         }
       },
-      "verdict": "REQUIRE_APPROVAL",
+      "verdict": "DENY",
       "reasons": [
-        "条件 C 未知：批任务缺少 deadline"
+        "服务正在退化，冻结优化",
+        "条件 C：批任务最长耗时 6922.3s > 0.8 × deadline 7200s"
       ],
-      "unknown_needs": [
-        "需要批任务的 deadline_seconds"
-      ],
+      "unknown_needs": [],
       "hpa_coupled": false,
       "evidence": [
         {
@@ -107,7 +106,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"data\",workload=\"batch-nightly\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"data\",workload=\"batch-nightly\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
@@ -209,10 +208,10 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
-          "window": "14d",
-          "value": null,
-          "source": "prometheus"
+          "query": "slo_catalog:data/batch-nightly.deadline_seconds",
+          "window": "catalog",
+          "value": 7200.0,
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
@@ -257,7 +256,44 @@
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "batch-nightly 当前 CPU request 为 2.0 core,limit 为 2.0 core,replicas 为 1;14 天观测 p50 为 0.01003,p95 为 0.99331,p99 为 1.02426,max 为 1.03。",
+          "evidence": "条件 A、B、D 均为 PASS:有效天数 14,覆盖率 1.0(E8、E9、E6),高峰期 throttling 为 0.001434,集群无 Pending(E11、E18),回滚容量也足够(E20、E22)。但条件 C 为 FAIL:批任务最长耗时 6922.3s,而 deadline 为 7200s(E16、E17),此时 burn_rate_1h 为 0.2592,剩余预算为 0.81(E14、E15)。",
+          "conclusion": "最终结论为 DENY,由条件 C 驱动:批任务最长耗时 6922.3s 超过 0.8 × deadline 7200s,SLO 不允许此时变更,因此冻结优化。"
+        },
+        "would_change": [
+          "批任务最长耗时降到 deadline 7200s 的 0.8 倍以内,条件 C 才可能通过",
+          "后续观测到批任务耗时稳定回落、服务不再处于退化状态"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E6",
+          "E11",
+          "E14",
+          "E15",
+          "E16",
+          "E17",
+          "E18",
+          "E20",
+          "E22",
+          "E8",
+          "E9"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "f55db33ba0ea"
+      },
+      "container": "job",
+      "slo": {
+        "burn_rate_1h": 0.2592,
+        "budget_remaining": 0.81,
+        "job_max_duration": 6922.3,
+        "deadline_seconds": 7200.0,
+        "defined": true,
+        "objectives": {}
+      }
     },
     {
       "id": "K-data-batch-nightly-memory",
@@ -318,8 +354,8 @@
           ]
         },
         "C": {
-          "status": "UNKNOWN",
-          "why": "批任务缺少 deadline",
+          "status": "FAIL",
+          "why": "批任务最长耗时 6922.3s > 0.8 × deadline 7200s",
           "evidence": [
             "E13",
             "E14",
@@ -340,13 +376,12 @@
           ]
         }
       },
-      "verdict": "REQUIRE_APPROVAL",
+      "verdict": "DENY",
       "reasons": [
-        "条件 C 未知：批任务缺少 deadline"
+        "服务正在退化，冻结优化",
+        "条件 C：批任务最长耗时 6922.3s > 0.8 × deadline 7200s"
       ],
-      "unknown_needs": [
-        "需要批任务的 deadline_seconds"
-      ],
+      "unknown_needs": [],
       "hpa_coupled": false,
       "evidence": [
         {
@@ -365,7 +400,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"data\",workload=\"batch-nightly\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"data\",workload=\"batch-nightly\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
@@ -460,10 +495,10 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
-          "window": "14d",
-          "value": null,
-          "source": "prometheus"
+          "query": "slo_catalog:data/batch-nightly.deadline_seconds",
+          "window": "catalog",
+          "value": 7200.0,
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
@@ -508,7 +543,46 @@
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "batch-nightly 当前内存 request 为 4.0 GiB,limit 为 6.0 GiB,replicas 为 1。过去 14 天观测到的内存 p95 为 1.19508,max 为 1.223905(E1、E2、E3、E5、E7)。",
+          "evidence": "14 天内存数据有效,覆盖率为 1.0,没有 OOMKilled 事件,推荐 request 为 1.5 GiB(E7、E11、E8、E9)。但批任务最长耗时为 6922.3s,已超过 deadline 7200s 对应的阈值,SLO 条件 C 未通过(E15、E16)。",
+          "conclusion": "最终结论为 DENY。条件 A、B、D 均 PASS,由条件 C 失败驱动:批任务最长耗时 6922.3s > 0.8 × deadline 7200s。此外 reasons 显示服务正在退化,优化被冻结(E13、E14、E15、E16)。"
+        },
+        "would_change": [
+          "批任务最长耗时降到 0.8 × deadline 7200s 以内,使条件 C 通过",
+          "服务退化状态解除,冻结取消",
+          "SLO 的 deadline 调整或批任务耗时有持续改善的新数据"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E1",
+          "E2",
+          "E3",
+          "E5",
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E13",
+          "E14",
+          "E15",
+          "E16"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "5cbbf531da62"
+      },
+      "container": "job",
+      "slo": {
+        "burn_rate_1h": 0.2592,
+        "budget_remaining": 0.81,
+        "job_max_duration": 6922.3,
+        "deadline_seconds": 7200.0,
+        "defined": true,
+        "objectives": {}
+      }
     },
     {
       "id": "K-shop-api-steady-cpu",
@@ -585,7 +659,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E18"
+            "E20"
           ]
         },
         "C": {
@@ -595,7 +669,9 @@
             "E14",
             "E15",
             "E16",
-            "E17"
+            "E17",
+            "E18",
+            "E19"
           ]
         },
         "D": {
@@ -604,10 +680,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E20",
+            "E22",
+            "E23",
             "E21",
-            "E19",
-            "E22"
+            "E24"
           ]
         }
       },
@@ -634,7 +710,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-steady\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-steady\"})",
           "window": "instant",
           "value": 3.0,
           "source": "prometheus"
@@ -757,55 +833,118 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/api-steady.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
+          "query": "slo_catalog:shop/api-steady.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
+          "query": "slo_catalog:shop/api-steady.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": "api-steady 的 CPU p99 只有 0.16494 core，当前 request 是 1 core，用不到一成半。推荐降到 0.25 core；三个副本一起降后节点数从 6 到 5，每月可兑现 $140.16。条件 A–D 都通过，可以做。"
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "api-steady 的 CPU request 为 1.0 core,limit 为 2.0 core,副本数 3,过去 14 天观测到的 p99 使用量仅 0.16494 core,max 为 0.16524 core。",
+          "evidence": "14 天内 p50 为 0.15327、p95 为 0.16401、p99 为 0.16494、max 为 0.16524(E4、E5、E6、E7),高峰期 throttling 为 0.001272,OOM 事件为 0.0(E11、E12)。SLO 燃烧率 0.3053,剩余预算 0.8062(E14、E15),集群 Pending 为 0.0(E20)。",
+          "conclusion": "判定为 ALLOW,条件 A–D 全部 PASS,且没有 HPA 联动。其中条件 B 的依据是推荐值 0.25 ≥ p99 加余量,高峰期 throttling 0.001272 低于 0.05;条件 D 的依据是缩容后空闲 21.25 core ≥ 回滚所需 2.25 core。"
+        },
+        "would_change": [
+          "若有效历史天数不足 14 或样本覆盖率低于 0.90,条件 A 将不再通过,判定会改变",
+          "若 SLO 燃烧率超过 1 或剩余预算低于 0.25,条件 C 将不再通过,判定会改变",
+          "若高峰期 throttling 升至 0.05 以上或集群出现 Pending,条件 B 将不再通过,判定会改变"
+        ],
+        "proposal": "将 shop/api-steady 的 CPU request 从 1.0 core 调整为 0.25 core,影响 3 个副本。request_value_usd_month(账面释放的预留价值)为 51.903,realizable_usd_month(节点实际移除后真正节省的费用)为 140.16,节点数由 6 降至 5。",
+        "evidence": [
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E11",
+          "E12",
+          "E14",
+          "E15",
+          "E20",
+          "E8",
+          "E9",
+          "E1",
+          "E3",
+          "E22",
+          "E23",
+          "E21",
+          "E24",
+          "E18",
+          "E19"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "8d731880085c"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.3053,
+        "budget_remaining": 0.8062,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-api-steady-memory",
@@ -883,7 +1022,7 @@
             "E7",
             "E11",
             "E2",
-            "E17"
+            "E19"
           ]
         },
         "C": {
@@ -893,7 +1032,9 @@
             "E13",
             "E14",
             "E15",
-            "E16"
+            "E16",
+            "E17",
+            "E18"
           ]
         },
         "D": {
@@ -902,10 +1043,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E19",
+            "E21",
+            "E22",
             "E20",
-            "E18",
-            "E21"
+            "E23"
           ]
         }
       },
@@ -932,7 +1073,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-steady\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-steady\"})",
           "window": "instant",
           "value": 3.0,
           "source": "prometheus"
@@ -1048,55 +1189,112 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/api-steady.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
+          "query": "slo_catalog:shop/api-steady.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E18",
+          "query": "slo_catalog:shop/api-steady.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E18",
+          "id": "E20",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "api-steady 的内存 request 为 2.0 GiB,limit 为 3.0 GiB,副本数 3;近 14 天观测到的 p50 为 0.900169,p95 为 0.932735,p99 为 0.935431,max 为 0.935998(单位 GiB)。",
+          "evidence": "14 天内最大工作集为 0.935998,OOMKilled 次数为 0.0,历史有效天数 14、覆盖率 1.0(E7、E11、E8、E9)。SLO 燃烧率 0.3053,剩余预算 0.8062;缩容后空闲 91.62 GiB,回滚所需 2.62 GiB(E13、E14、E22、E23)。",
+          "conclusion": "判定为 ALLOW,条件 A、B、C、D 全部 PASS,且没有 HPA 联动。其中条件 B 给出推荐 request 1.125 GiB(max_working_set*(1+0.2) ceil 64Mi),高于峰值 0.935998,没有 OOM,可以安全下调。"
+        },
+        "would_change": [
+          "如果有效历史天数低于 14 或样本覆盖率低于 0.90,条件 A 将不再通过,判定会改变",
+          "如果 SLO 燃烧率升到高于 1,或剩余预算低于 0.25,条件 C 将失败,判定会改变",
+          "如果出现 OOMKilled 事件,或峰值接近 limit 的 0.9 倍,条件 B 将失败,判定会改变"
+        ],
+        "proposal": "将 shop/api-steady 的内存 request 从 2.0 GiB 调整为 1.125 GiB,影响 3 个副本。request_value_usd_month(账面释放的预留价值)为 7.856625,realizable_usd_month(节点实际移除后真正节省的金额)为 0.0,因为节点数在调整前后均为 6。",
+        "evidence": [
+          "E1",
+          "E2",
+          "E3",
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E13",
+          "E14",
+          "E19",
+          "E22",
+          "E23",
+          "E12"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "b9918a211f34"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.3053,
+        "budget_remaining": 0.8062,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-api-tidal-cpu",
@@ -1150,7 +1348,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E18"
+            "E20"
           ]
         },
         "C": {
@@ -1160,7 +1358,9 @@
             "E14",
             "E15",
             "E16",
-            "E17"
+            "E17",
+            "E18",
+            "E19"
           ]
         },
         "D": {
@@ -1169,10 +1369,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E20",
+            "E22",
+            "E23",
             "E21",
-            "E19",
-            "E22"
+            "E24"
           ]
         }
       },
@@ -1200,7 +1400,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-tidal\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-tidal\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -1300,55 +1500,108 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/api-tidal.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
+          "query": "slo_catalog:shop/api-tidal.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
+          "query": "slo_catalog:shop/api-tidal.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "api-tidal 的 CPU request 为 2.0 core,limit 为 2.0 core,副本数 2。14 天观测使用量 p50 为 0.12473,p95 为 1.14809,p99 为 1.24296,max 为 1.88384。",
+          "evidence": "高峰时段(UTC 14 点)的 throttling 比例为 0.162039,已高于阈值 0.05(E11、E6)。有效天数 14,覆盖率 1.0,条件 A 通过(E8、E9);SLO 燃烧率 0.2807,剩余预算 0.8089,条件 C 通过(E14、E15);缩容后空闲容量足够回滚,条件 D 通过(E22、E24、E21)。",
+          "conclusion": "结论为 DENY,由条件 B 驱动:高峰期 throttling 比例 0.162 ≥ 0.05,在当前 2.0 core 的 limit 下已出现明显限流,不具备继续降配的余量。建议 request 1.65 的方案不予采纳。"
+        },
+        "would_change": [
+          "高峰期 throttling 比例降到 0.05 以下(例如先排查并缓解 14 点高峰的限流原因)后重新评估条件 B",
+          "提供更多天数、无限流的高峰数据,证明 p99 1.24296 在新 request 下仍有足够余量"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E6",
+          "E11",
+          "E20",
+          "E8",
+          "E9",
+          "E14",
+          "E15",
+          "E22",
+          "E24",
+          "E21"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "7d115ea54ce2"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.2807,
+        "budget_remaining": 0.8089,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-api-tidal-memory",
@@ -1426,7 +1679,7 @@
             "E7",
             "E11",
             "E2",
-            "E17"
+            "E19"
           ]
         },
         "C": {
@@ -1436,7 +1689,9 @@
             "E13",
             "E14",
             "E15",
-            "E16"
+            "E16",
+            "E17",
+            "E18"
           ]
         },
         "D": {
@@ -1468,7 +1723,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-tidal\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"api-tidal\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -1584,55 +1839,108 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/api-tidal.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
+          "query": "slo_catalog:shop/api-tidal.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E18",
+          "query": "slo_catalog:shop/api-tidal.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E18",
+          "id": "E20",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "api-tidal 工作负载的内存 request 为 6.0 GiB,limit 为 8.0 GiB,副本数 2。14 天内工作集 p50 为 5.100871,p95 为 5.146185,p99 为 5.150013,最大值为 5.150999(单位 GiB)。",
+          "evidence": "14 天最大工作集为 5.150999(E7),p99 为 5.150013(E6),期间 OOMKilled 事件为 0.0(E11),集群无 Pending Pod(E19)。推荐 request 为 6.1875,不低于当前的 6.0。",
+          "conclusion": "判定为 NOOP:推荐值 6.1875 不低于当前值 6,无需下调 request。条件 A、B、C、D 均为 PASS,没有需要变更的内容,因此节省为 0.0。"
+        },
+        "would_change": [
+          "若观测到的峰值工作集明显下降,使推荐值低于当前的 6.0,则可能出现下调空间",
+          "若连续多天的最大工作集持续低于现有水平,推荐值会随之降低,判定才可能改变"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E13",
+          "E14",
+          "E19"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "7ebd1a3491cb"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.2807,
+        "budget_remaining": 0.8089,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-burning-slo-cpu",
@@ -1709,7 +2017,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E18"
+            "E20"
           ]
         },
         "C": {
@@ -1719,7 +2027,9 @@
             "E14",
             "E15",
             "E16",
-            "E17"
+            "E17",
+            "E18",
+            "E19"
           ]
         },
         "D": {
@@ -1728,10 +2038,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E20",
+            "E22",
+            "E23",
             "E21",
-            "E19",
-            "E22"
+            "E24"
           ]
         }
       },
@@ -1759,7 +2069,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"burning-slo\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"burning-slo\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -1882,55 +2192,107 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/burning-slo.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
+          "query": "slo_catalog:shop/burning-slo.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
+          "query": "slo_catalog:shop/burning-slo.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "当前 CPU request 为 1.0 core,limit 为 2.0 core,副本数 2;14 天观测到的使用量 p50 为 0.10123,p99 为 0.10895,max 为 0.10908。",
+          "evidence": "使用量远低于当前 request,推荐 request 为 0.15,高峰期 throttling 为 0.001309(E1、E3、E6、E11)。但 1h 燃烧率为 2.3861,剩余错误预算为 0.125,服务正在消耗错误预算(E14、E15)。",
+          "conclusion": "最终结论为 DENY,由条件 C 驱动:1h 燃烧率 2.3861 > 1,且剩余错误预算 0.125 < 0.25,因此冻结优化。条件 A、B、D 均为 PASS,但不能抵消 C 的失败。"
+        },
+        "would_change": [
+          "1h 燃烧率降到 1 以下,服务不再消耗错误预算",
+          "剩余错误预算回升到 0.25 以上",
+          "SLO 指标恢复稳定后重新评估,条件 C 变为 PASS"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E1",
+          "E3",
+          "E6",
+          "E11",
+          "E14",
+          "E15",
+          "E18",
+          "E19"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "88025e563beb"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 2.3861,
+        "budget_remaining": 0.125,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-burning-slo-memory",
@@ -2008,7 +2370,7 @@
             "E7",
             "E11",
             "E2",
-            "E17"
+            "E19"
           ]
         },
         "C": {
@@ -2018,7 +2380,9 @@
             "E13",
             "E14",
             "E15",
-            "E16"
+            "E16",
+            "E17",
+            "E18"
           ]
         },
         "D": {
@@ -2027,10 +2391,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E19",
+            "E21",
+            "E22",
             "E20",
-            "E18",
-            "E21"
+            "E23"
           ]
         }
       },
@@ -2058,7 +2422,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"burning-slo\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"burning-slo\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -2174,55 +2538,107 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/burning-slo.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
+          "query": "slo_catalog:shop/burning-slo.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E18",
+          "query": "slo_catalog:shop/burning-slo.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E18",
+          "id": "E20",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "workload shop/burning-slo 的内存 request 为 2.0 GiB，limit 为 3.0 GiB，副本数 2。过去 14 天内存 working set 的 p50 为 0.600165，p95 为 0.62156，p99 为 0.623429，max 为 0.623998，OOM 事件为 0.0。",
+          "evidence": "条件 A、B、D 均为 PASS：有效天数 14，覆盖率 1.0（E7、E8、E9），无 OOMKilled（E11），集群无 Pending（E19）。但 1h 燃烧率为 2.3861（E13），剩余错误预算为 0.125（E14），SLO 已定义，可用性目标 0.999，p99 目标 0.3（E17、E18）。",
+          "conclusion": "结论为 DENY，由条件 C 驱动：1h 燃烧率 2.3861 > 1，且剩余错误预算 0.125 < 0.25，服务正在消耗错误预算，因此冻结优化。"
+        },
+        "would_change": [
+          "1h 燃烧率降到 1 或以下，服务不再消耗错误预算",
+          "剩余错误预算恢复到 0.25 或以上"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E13",
+          "E14",
+          "E17",
+          "E18",
+          "E19"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "be5c636155ce"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 2.3861,
+        "budget_remaining": 0.125,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-hpa-managed-cpu",
@@ -2299,7 +2715,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E20"
+            "E22"
           ]
         },
         "C": {
@@ -2309,7 +2725,9 @@
             "E16",
             "E17",
             "E18",
-            "E19"
+            "E19",
+            "E20",
+            "E21"
           ]
         },
         "D": {
@@ -2318,10 +2736,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E22",
+            "E24",
+            "E25",
             "E23",
-            "E21",
-            "E24"
+            "E26"
           ]
         }
       },
@@ -2348,7 +2766,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"hpa-managed\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"hpa-managed\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -2485,55 +2903,106 @@
         },
         {
           "id": "E19",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/hpa-managed.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E20",
+          "query": "slo_catalog:shop/hpa-managed.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E21",
+          "query": "slo_catalog:shop/hpa-managed.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E22",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E24",
+          "id": "E26",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E25",
+          "id": "E27",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "[已移除：含未取自证据的数字]",
+          "evidence": "14 天 p50 为 0.30318、p95 为 0.32463、p99 为 0.32662(E4、E5、E6),高峰期 throttling 为 0.00132,OOM 事件为 0.0(E11、E12)。HPA 以该资源为扩缩指标,目标值为 70.0,当前副本 2.0,最大副本 6.0(E13、E14、E15)。",
+          "conclusion": "结论为 REQUIRE_APPROVAL:条件 A、B、C、D 均为 PASS,但 HPA 以该资源作为扩缩指标(hpa_coupled),改 request 会改变副本数,因此需要人工确认。"
+        },
+        "would_change": [
+          "若 HPA 不再以 CPU 作为扩缩指标(改用其他指标),则不再受 HPA 耦合限制,可以直接放行",
+          "若人工确认缩小 request 后 HPA 的副本数变化(最大副本 6.0 以内)可接受,则可批准该变更"
+        ],
+        "proposal": "建议将 hpa-managed 的 CPU request 从 1.0 core 调整为 0.45 core,影响副本数 2;request_value_usd_month(账面释放的预留价值)为 25.3748,realizable_usd_month(移除节点后实际节省)为 0.0,节点数前后均为 6。人工需确认:因 HPA 以 CPU 利用率(目标 70.0)扩缩,降低 request 会改变副本数,该变化是否可接受。",
+        "evidence": [
+          "E4",
+          "E5",
+          "E6",
+          "E11",
+          "E12",
+          "E13",
+          "E14",
+          "E15"
+        ],
+        "redactions": 1,
+        "model": "sonnet",
+        "cassette": "22d5e7eb5ddf"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.3312,
+        "budget_remaining": 0.8123,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-hpa-managed-memory",
@@ -2611,7 +3080,7 @@
             "E7",
             "E11",
             "E2",
-            "E19"
+            "E21"
           ]
         },
         "C": {
@@ -2621,7 +3090,9 @@
             "E15",
             "E16",
             "E17",
-            "E18"
+            "E18",
+            "E19",
+            "E20"
           ]
         },
         "D": {
@@ -2630,10 +3101,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E21",
+            "E23",
+            "E24",
             "E22",
-            "E20",
-            "E23"
+            "E25"
           ]
         }
       },
@@ -2660,7 +3131,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"hpa-managed\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"hpa-managed\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -2790,55 +3261,109 @@
         },
         {
           "id": "E18",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/hpa-managed.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E19",
+          "query": "slo_catalog:shop/hpa-managed.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
+          "query": "slo_catalog:shop/hpa-managed.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E21",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E24",
+          "id": "E26",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "shop 命名空间下 hpa-managed 的内存 request 为 2.0 GiB,limit 为 3.0 GiB,当前副本数 2。过去 14 天观测到的内存工作集 p50 为 0.899901,p95 为 0.932686,p99 为 0.935347,最大值为 0.93599。",
+          "evidence": "14 天内有效天数为 14,样本覆盖率为 1.0,且 OOM 事件为 0.0(E7、E8、E9、E11)。推荐 request 为 1.125 GiB,高于峰值 0.93599 加余量的要求;集群 Pending Pod 为 0.0(E21)。SLO 燃烧率为 0.3312,剩余预算为 0.8123(E15、E16),节点最小可分配内存为 14.5(E24)。",
+          "conclusion": "结论为 ALLOW,条件 A、B、C、D 全部通过,且没有 HPA 联动。其中条件 B 的关键数据是推荐值 1.125 对应峰值 0.93599,且 OOM 事件为 0.0;条件 C 的燃烧率 0.3312 也处于允许范围内。"
+        },
+        "would_change": [
+          "若有效历史天数低于 14 或样本覆盖率低于 0.90,条件 A 将不再通过",
+          "若燃烧率升高或剩余预算降低到阈值以下,条件 C 将不再通过",
+          "若出现 OOMKilled 事件或集群出现 Pending Pod,条件 B 将不再通过"
+        ],
+        "proposal": "将 shop/hpa-managed 的内存 request 从 2.0 GiB 调整为 1.125 GiB,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 5.23775,realizable_usd_month(移除节点后实际节省)为 0.0,因为节点数在调整前后均为 6。",
+        "evidence": [
+          "E1",
+          "E3",
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E15",
+          "E16",
+          "E21",
+          "E24"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "8882f9c9a468"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.3312,
+        "budget_remaining": 0.8123,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-mem-near-oom-cpu",
@@ -2915,7 +3440,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E18"
+            "E20"
           ]
         },
         "C": {
@@ -2925,7 +3450,9 @@
             "E14",
             "E15",
             "E16",
-            "E17"
+            "E17",
+            "E18",
+            "E19"
           ]
         },
         "D": {
@@ -2934,10 +3461,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E20",
+            "E22",
+            "E23",
             "E21",
-            "E19",
-            "E22"
+            "E24"
           ]
         }
       },
@@ -2964,7 +3491,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"mem-near-oom\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"mem-near-oom\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -3087,55 +3614,112 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/mem-near-oom.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
+          "query": "slo_catalog:shop/mem-near-oom.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
+          "query": "slo_catalog:shop/mem-near-oom.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "当前 CPU request 为 0.5 core,limit 为 1.0 core,副本数 2。观测到的使用量很低:p99 为 0.04435,max 为 0.04444。",
+          "evidence": "14 天的使用量数据显示 p50 为 0.04033,p95 为 0.04402,p99 为 0.04435(E4、E5、E6),max 为 0.04444(E7)。高峰期 throttling 为 0.001339(E11),集群没有 Pending 的 Pod(E20),燃烧率为 0.2982,剩余预算为 0.816(E14、E15)。",
+          "conclusion": "裁决为 ALLOW,条件 A、B、C、D 全部通过,且没有 HPA 联动。其中条件 B 说明推荐值 0.1 满足 p99 的余量要求,条件 D 说明缩容后空闲 19.80 core,大于回滚所需的 0.80 core。"
+        },
+        "would_change": [
+          "如果有效历史数据少于 14 天或样本覆盖率低于 0.90,条件 A 将不通过,裁决会改变。",
+          "如果燃烧率超过 1 或剩余预算低于 0.25,条件 C 将不通过,裁决会改变。",
+          "如果高峰期 throttling 升高到 0.05 以上或集群出现 Pending Pod,条件 B 将不通过,裁决会改变。"
+        ],
+        "proposal": "将 shop/mem-near-oom 的 CPU request 从 0.5 core 调整为 0.1 core,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 18.4544,realizable_usd_month(移除节点后实际节省的金额)为 0.0,节点数保持 6 个不变。",
+        "evidence": [
+          "E1",
+          "E3",
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E11",
+          "E14",
+          "E15",
+          "E20",
+          "E21",
+          "E22",
+          "E24"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "8aefae02ee15"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.2982,
+        "budget_remaining": 0.816,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-mem-near-oom-memory",
@@ -3207,7 +3791,7 @@
             "E7",
             "E11",
             "E2",
-            "E17"
+            "E19"
           ]
         },
         "C": {
@@ -3217,7 +3801,9 @@
             "E13",
             "E14",
             "E15",
-            "E16"
+            "E16",
+            "E17",
+            "E18"
           ]
         },
         "D": {
@@ -3251,7 +3837,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"mem-near-oom\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"mem-near-oom\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -3361,55 +3947,105 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/mem-near-oom.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
+          "query": "slo_catalog:shop/mem-near-oom.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E18",
+          "query": "slo_catalog:shop/mem-near-oom.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E18",
+          "id": "E20",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "memory 当前 request 为 2.0 GiB，limit 为 2.0 GiB，副本数 2；14 天观测 p50 为 1.539608，p95 为 1.846078，p99 为 1.874635，峰值 max 为 1.99 GiB。",
+          "evidence": "14 天窗口内峰值 1.99 GiB（E7），与 limit 2.0 GiB（E2）几乎持平；同一窗口内发生了 1 次 OOMKilled（E11）。历史数据充足，有效天数 14，覆盖率 1.0（E8、E9）；SLO 燃烧率 0.2982、剩余预算 0.816（E13、E14）。",
+          "conclusion": "verdict 为 DENY，由条件 B 驱动：窗口内有 1 次 OOMKilled，且峰值 1.99 GiB 已贴近 limit 2 GiB，当前配置偏低，不应降配。条件 A、C、D 均为 PASS，推荐值 2.4375 高于当前值 2.0，仅供人工考虑上调。"
+        },
+        "would_change": [
+          "窗口内没有 OOMKilled 事件（E11 为 0）",
+          "峰值内存明显低于 limit，不再贴近 OOM（E7 对比 E2）"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E2",
+          "E7",
+          "E11",
+          "E8",
+          "E9",
+          "E13",
+          "E14"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "705b19ac3044"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.2982,
+        "budget_remaining": 0.816,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-new-service-cpu",
@@ -3486,7 +4122,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E18"
+            "E20"
           ]
         },
         "C": {
@@ -3496,7 +4132,9 @@
             "E14",
             "E15",
             "E16",
-            "E17"
+            "E17",
+            "E18",
+            "E19"
           ]
         },
         "D": {
@@ -3505,10 +4143,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E20",
+            "E22",
+            "E23",
             "E21",
-            "E19",
-            "E22"
+            "E24"
           ]
         }
       },
@@ -3539,7 +4177,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"new-service\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"new-service\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -3662,55 +4300,104 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"new-service\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/new-service.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
+          "query": "slo_catalog:shop/new-service.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
+          "query": "slo_catalog:shop/new-service.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "new-service 的 CPU request 为 0.5 core,limit 为 1.0 core,副本数 2。观测到的 CPU 使用 p50 为 0.0503,p95 为 0.05406,p99 为 0.05447,最大值 0.05454。",
+          "evidence": "有效天数只有 5,样本覆盖率为 0.360119(E8、E9),p99 为 0.05447(E6)。条件 B、C、D 均为 PASS:高峰期 throttling 为 0.001292(E11),燃烧率 0.327(E14),剩余预算 0.8078(E15)。",
+          "conclusion": "判定为 UNKNOWN,由条件 A 驱动:有效天数 5 不足 14,覆盖率 0.360119 低于 0.90,数据不足以判定。"
+        },
+        "would_change": [
+          "积累至少 14 天的有效 CPU 使用数据(当前为 5 天)",
+          "样本覆盖率提升到至少 0.90(当前为 0.360119)"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E6",
+          "E8",
+          "E9",
+          "E11",
+          "E14",
+          "E15"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "c1ed1ca96d15"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.327,
+        "budget_remaining": 0.8078,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-new-service-memory",
@@ -3788,7 +4475,7 @@
             "E7",
             "E11",
             "E2",
-            "E17"
+            "E19"
           ]
         },
         "C": {
@@ -3798,7 +4485,9 @@
             "E13",
             "E14",
             "E15",
-            "E16"
+            "E16",
+            "E17",
+            "E18"
           ]
         },
         "D": {
@@ -3807,10 +4496,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E19",
+            "E21",
+            "E22",
             "E20",
-            "E18",
-            "E21"
+            "E23"
           ]
         }
       },
@@ -3841,7 +4530,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"new-service\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"new-service\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -3957,55 +4646,105 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"new-service\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/new-service.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
+          "query": "slo_catalog:shop/new-service.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E18",
+          "query": "slo_catalog:shop/new-service.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E18",
+          "id": "E20",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "new-service 的内存 request 为 1.0 GiB,limit 为 2.0 GiB,副本数 2。观测到的使用量 p50 为 0.300026,p95 为 0.310746,p99 为 0.311831,max 为 0.311993。",
+          "evidence": "内存使用的有效天数只有 5,样本覆盖率为 0.360119,而判定需要 14 天和 0.90(E8、E9)。峰值 0.311993 低于 limit 2.0,且无 OOMKilled 事件(E7、E2、E11)。SLO 燃烧率 0.327,剩余预算 0.8078(E13、E14)。",
+          "conclusion": "判定为 UNKNOWN,由条件 A 驱动:有效天数 5 不足 14,覆盖率 0.36 低于 0.90,数据不足以判断。条件 B、C、D 均为 PASS,但不能弥补历史数据不足。"
+        },
+        "would_change": [
+          "积累至少 14 天的内存使用数据(当前有效天数为 5)",
+          "样本覆盖率提升到至少 0.90(当前为 0.360119)"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E7",
+          "E8",
+          "E9",
+          "E2",
+          "E11",
+          "E13",
+          "E14"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "25d3787c250c"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.327,
+        "budget_remaining": 0.8078,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-packing-trap-cpu",
@@ -4082,7 +4821,7 @@
           "evidence": [
             "E6",
             "E11",
-            "E18"
+            "E20"
           ]
         },
         "C": {
@@ -4092,7 +4831,9 @@
             "E14",
             "E15",
             "E16",
-            "E17"
+            "E17",
+            "E18",
+            "E19"
           ]
         },
         "D": {
@@ -4101,10 +4842,10 @@
           "evidence": [
             "E1",
             "E3",
-            "E20",
+            "E22",
+            "E23",
             "E21",
-            "E19",
-            "E22"
+            "E24"
           ]
         }
       },
@@ -4131,7 +4872,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"packing-trap\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"packing-trap\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -4254,55 +4995,113 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/packing-trap.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
+          "query": "slo_catalog:shop/packing-trap.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
+          "query": "slo_catalog:shop/packing-trap.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E20",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E23",
+          "id": "E25",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "packing-trap 的 CPU 当前 request 为 1.0 core,limit 为 2.0 core,副本数 2;近 14 天观测到的使用量 p50 为 0.12115,p95 为 0.12997,p99 为 0.13072,最大值为 0.13089。",
+          "evidence": "14 天内 p99 使用量为 0.13072,最大值仅 0.13089(E6、E7),远低于当前 request;高峰期 throttling 为 0.001315,OOM 事件为 0.0,集群无 Pending Pod(E11、E12、E20)。SLO 燃烧率为 0.316,剩余预算为 0.8062(E14、E15),有效天数 14 且覆盖率 1.0(E8、E9)。",
+          "conclusion": "结论为 ALLOW:条件 A、B、C、D 全部 PASS,且无 HPA 联动。其中条件 B 的推荐值 0.2 满足 p99 加 0.3 余量的要求,条件 D 显示缩容后空闲 20.60 core 大于回滚所需的 1.60 core。"
+        },
+        "would_change": [
+          "如果有效历史天数少于 14 天或样本覆盖率低于 0.90,条件 A 将不再通过,结论会改变",
+          "如果高峰期 throttling 升高到 0.05 以上或集群出现 Pending Pod,条件 B 将失败",
+          "如果 SLO 燃烧率升高到 1 以上或剩余预算低于 0.25,条件 C 将失败"
+        ],
+        "proposal": "将 packing-trap 的 CPU request 从 1.0 core 调整为 0.2 core,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 36.9088 美元;realizable_usd_month(节点实际移除后真正节省的金额)为 0.0 美元,节点数保持 6 个不变。",
+        "evidence": [
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E12",
+          "E14",
+          "E15",
+          "E20",
+          "E21",
+          "E22",
+          "E24"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "4fe33b942924"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.316,
+        "budget_remaining": 0.8062,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-shop-packing-trap-memory",
@@ -4380,7 +5179,7 @@
             "E7",
             "E11",
             "E2",
-            "E17"
+            "E19"
           ]
         },
         "C": {
@@ -4390,7 +5189,9 @@
             "E13",
             "E14",
             "E15",
-            "E16"
+            "E16",
+            "E17",
+            "E18"
           ]
         },
         "D": {
@@ -4422,7 +5223,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"packing-trap\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"shop\",workload=\"packing-trap\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -4538,55 +5339,107 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:shop/packing-trap.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
+          "query": "slo_catalog:shop/packing-trap.availability",
+          "window": "catalog",
+          "value": 0.999,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E18",
+          "query": "slo_catalog:shop/packing-trap.p99_seconds",
+          "window": "catalog",
+          "value": 0.3,
+          "source": "slo_catalog"
+        },
+        {
+          "id": "E19",
           "query": "sum(kube_pod_status_phase{phase=\"Pending\"})",
           "window": "instant",
           "value": 0.0,
           "source": "prometheus"
         },
         {
-          "id": "E18",
+          "id": "E20",
           "query": "count(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
-          "id": "E19",
+          "id": "E21",
           "query": "min(kube_node_status_allocatable{resource=\"cpu\"})",
           "window": "instant",
           "value": 3.8,
           "source": "prometheus"
         },
         {
-          "id": "E20",
+          "id": "E22",
           "query": "min(kube_node_status_allocatable{resource=\"memory\"})",
           "window": "instant",
           "value": 14.5,
           "source": "prometheus"
         },
         {
-          "id": "E21",
+          "id": "E23",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"cpu\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         },
         {
-          "id": "E22",
+          "id": "E24",
           "query": "max by (namespace, workload, pod)(kube_pod_container_resource_requests{resource=\"memory\"})",
           "window": "instant",
           "value": 18.0,
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "packing-trap 工作负载的内存 request 为 8.0 GiB,limit 为 10.0 GiB,副本数 2。过去 14 天内存工作集 p50 为 6.701315,p95 为 6.760771,最大值为 6.76699,OOM 事件为 0.0。",
+          "evidence": "14 天内存工作集最大值为 6.76699(E7),p99 为 6.765685(E6),OOMKilled 为 0.0(E11)。按方法 max_working_set*(1+0.2) 计算的推荐 request 为 8.125,不低于当前的 8.0(E1),所以没有下调空间;节点数前后均为 6。",
+          "conclusion": "最终结论为 NOOP:推荐值 8.125 不低于当前值 8,无需调整。条件 A、B、C、D 均为 PASS,没有失败条件,结论由推荐值不低于当前 request 这一事实决定。"
+        },
+        "would_change": [
+          "如果内存工作集峰值明显下降,使推荐值低于当前 request 8.0,则可能出现下调空间",
+          "如果后续出现 OOMKilled 事件,则需要重新评估是否应上调 request",
+          "如果 SLO 燃烧率超过 1 或剩余预算低于 0.25,则条件 C 将不再通过"
+        ],
+        "proposal": null,
+        "evidence": [
+          "E1",
+          "E2",
+          "E6",
+          "E7",
+          "E11",
+          "E13",
+          "E14",
+          "E19"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "6be4d8253501"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": 0.316,
+        "budget_remaining": 0.8062,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": true,
+        "objectives": {
+          "availability": 0.999,
+          "p99_seconds": 0.3
+        }
+      }
     },
     {
       "id": "K-tools-no-slo-cpu",
@@ -4668,7 +5521,7 @@
         },
         "C": {
           "status": "UNKNOWN",
-          "why": "未定义 SLO，不能用利用率替代",
+          "why": "SLO 目录里没有该 workload 的定义，指标里的 slo_* 序列不能替代",
           "evidence": [
             "E14",
             "E15",
@@ -4691,10 +5544,10 @@
       },
       "verdict": "REQUIRE_APPROVAL",
       "reasons": [
-        "条件 C 未知：未定义 SLO，不能用利用率替代"
+        "条件 C 未知：SLO 目录里没有该 workload 的定义，指标里的 slo_* 序列不能替代"
       ],
       "unknown_needs": [
-        "需要为该 workload 定义 SLO（slo_error_budget_remaining_ratio、slo_burn_rate_1h 或批任务 deadline）"
+        "需要在 SLO 目录里为该 workload 定义 SLO（availability / p99_seconds / 批任务 deadline_seconds）"
       ],
       "hpa_coupled": false,
       "evidence": [
@@ -4714,7 +5567,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"tools\",workload=\"no-slo\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"tools\",workload=\"no-slo\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -4837,10 +5690,10 @@
         },
         {
           "id": "E17",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:tools/no-slo.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E18",
@@ -4885,7 +5738,46 @@
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "该 workload 当前 CPU request 为 1.0 core，limit 为 2.0 core，副本数 2。14 天观测的 CPU 使用 p50 为 0.12129，p99 为 0.1307，max 为 0.13089。",
+          "evidence": "14 天的 p99 使用量为 0.1307，max 为 0.13089（E6、E7），样本覆盖率 1.00，有效天数 14（E8、E9）。高峰期 throttling 为 0.001432（E11），OOM 事件为 0.0（E12），集群 Pending 为 0.0（E18）。SLO 目录和 slo_* 指标均无该 workload 的定义（E14、E15、E16、E17）。",
+          "conclusion": "判定为 REQUIRE_APPROVAL，由条件 C 驱动：SLO 目录里没有该 workload 的定义，状态为 UNKNOWN。条件 A、B、D 均为 PASS，所以只差人工确认 SLO 是否允许这次变更。"
+        },
+        "would_change": [
+          "在 SLO 目录里为 no-slo 定义 SLO（availability、p99_seconds 或 deadline_seconds），使条件 C 可以评估",
+          "定义 SLO 后，burn rate 与剩余错误预算数据可用且处于健康范围，条件 C 即可通过"
+        ],
+        "proposal": "建议将 tools/no-slo 的 CPU request 从 1.0 core 改为 0.2 core，影响 2 个副本。request_value_usd_month 为 36.9088（账面释放的预留价值），realizable_usd_month 为 140.16（节点从 6 个减到 5 个后实际节省）。人工需要确认该 workload 没有未登记的 SLO 或延迟要求，允许在没有 SLO 定义的情况下缩减。",
+        "evidence": [
+          "E1",
+          "E3",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E11",
+          "E12",
+          "E14",
+          "E15",
+          "E16",
+          "E17",
+          "E18"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "181ab9198c77"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": null,
+        "budget_remaining": null,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": false,
+        "objectives": {}
+      }
     },
     {
       "id": "K-tools-no-slo-memory",
@@ -4968,7 +5860,7 @@
         },
         "C": {
           "status": "UNKNOWN",
-          "why": "未定义 SLO，不能用利用率替代",
+          "why": "SLO 目录里没有该 workload 的定义，指标里的 slo_* 序列不能替代",
           "evidence": [
             "E13",
             "E14",
@@ -4991,10 +5883,10 @@
       },
       "verdict": "REQUIRE_APPROVAL",
       "reasons": [
-        "条件 C 未知：未定义 SLO，不能用利用率替代"
+        "条件 C 未知：SLO 目录里没有该 workload 的定义，指标里的 slo_* 序列不能替代"
       ],
       "unknown_needs": [
-        "需要为该 workload 定义 SLO（slo_error_budget_remaining_ratio、slo_burn_rate_1h 或批任务 deadline）"
+        "需要在 SLO 目录里为该 workload 定义 SLO（availability / p99_seconds / 批任务 deadline_seconds）"
       ],
       "hpa_coupled": false,
       "evidence": [
@@ -5014,7 +5906,7 @@
         },
         {
           "id": "E3",
-          "query": "max by (workload)(kube_deployment_spec_replicas{namespace=\"tools\",workload=\"no-slo\"})",
+          "query": "max by (workload, container)(kube_deployment_spec_replicas{namespace=\"tools\",workload=\"no-slo\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -5130,10 +6022,10 @@
         },
         {
           "id": "E16",
-          "query": "max by (workload, deadline_seconds)(max_over_time(job_last_duration_seconds{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
-          "window": "14d",
+          "query": "slo_catalog:tools/no-slo.deadline_seconds",
+          "window": "catalog",
           "value": null,
-          "source": "prometheus"
+          "source": "slo_catalog"
         },
         {
           "id": "E17",
@@ -5178,7 +6070,43 @@
           "source": "prometheus"
         }
       ],
-      "narrative": null
+      "narrative": {
+        "source": "llm",
+        "why": {
+          "status": "该 workload 当前内存 request 为 2.0 GiB,limit 为 3.0 GiB,副本数 2。14 天内观测到的 p50 为 0.800083,p95 为 0.829034,p99 为 0.831529,最大值 0.831979,无 OOMKilled 事件。",
+          "evidence": "14 天历史数据完整(有效天数 14,覆盖率 1.0),峰值 0.831979 远低于推荐值 1.0 GiB,且 OOMKilled 为 0.0、集群无 Pending Pod(E7、E11、E17),因此条件 A、B、D 均通过。但 SLO 目录中没有该 workload 的定义,burn rate 和错误预算均为空(E13、E14、E15、E16)。",
+          "conclusion": "判定为 REQUIRE_APPROVAL,由条件 C 驱动:条件 C 状态为 UNKNOWN,因为 SLO 目录里没有该 workload 的定义,无法确认 SLO 是否允许变更。"
+        },
+        "would_change": [
+          "在 SLO 目录中为 tools/no-slo 定义 SLO(availability、p99_seconds 或 deadline_seconds),并提供可用的 burn rate 与剩余错误预算",
+          "SLO 定义补齐且 burn rate 与错误预算显示允许变更,条件 C 即可转为 PASS"
+        ],
+        "proposal": "将 tools/no-slo 的内存 request 从 2.0 GiB 调整为 1.0 GiB,影响 2 个副本;request_value_usd_month(账面释放的预留价值)为 5.986,realizable_usd_month(移除节点后实际节省)为 0.0,节点数前后均为 6。人工需确认该 workload 没有未登记的 SLO 要求,可以接受这次内存缩容。",
+        "evidence": [
+          "E1",
+          "E2",
+          "E3",
+          "E7",
+          "E11",
+          "E13",
+          "E14",
+          "E15",
+          "E16",
+          "E17"
+        ],
+        "redactions": 0,
+        "model": "sonnet",
+        "cassette": "fddfb387f44b"
+      },
+      "container": "app",
+      "slo": {
+        "burn_rate_1h": null,
+        "budget_remaining": null,
+        "job_max_duration": null,
+        "deadline_seconds": null,
+        "defined": false,
+        "objectives": {}
+      }
     }
   ]
 }

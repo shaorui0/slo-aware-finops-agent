@@ -9,18 +9,18 @@ metadata:
   name: api-steady
   namespace: shop
 spec:
-  replicas: 1
+  replicas: 3                       # same as the synthetic world's shop/api-steady (testenv/k8s_world.yaml), so a generated plan's `before` matches
   selector:
     matchLabels: {app: api-steady}
   strategy:
-    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}   # one node: no room for a surge pod of 1 core / 2Gi
   template:
     metadata:
       labels: {app: api-steady}
     spec:
       terminationGracePeriodSeconds: 1
       containers:
-        - name: api
+        - name: app                  # container name, requests and limits below are copied from the synthetic world's api-steady
           image: python:3.12-alpine
           imagePullPolicy: IfNotPresent
           command: ["python", "-u", "/app/app.py"]
@@ -28,10 +28,10 @@ spec:
           readinessProbe:
             httpGet: {path: /healthz, port: 8080}
             periodSeconds: 2
-          # over-provisioned on purpose: real need is ~0.1 core at normal load
+          # over-provisioned on purpose: real need is ~0.15 core and ~0.9 GiB (the synthetic world), far less here
           resources:
-            requests: {cpu: 500m, memory: 128Mi}
-            limits: {cpu: "1", memory: 256Mi}
+            requests: {cpu: "1", memory: 2Gi}
+            limits: {cpu: "2", memory: 3Gi}
           volumeMounts: [{name: app, mountPath: /app}]
       volumes:
         - name: app
@@ -68,10 +68,11 @@ spec:
           command: ["python", "-u", "/app/loadgen.py"]
           env:
             - {name: RPS, value: "5"}
+            - {name: WORKERS, value: "16"}
             - {name: TARGET, value: "http://api-steady:8080/"}
           resources:
             requests: {cpu: 50m, memory: 32Mi}
-            limits: {cpu: 500m, memory: 128Mi}
+            limits: {cpu: "2", memory: 256Mi}
           volumeMounts: [{name: app, mountPath: /app}]
       volumes:
         - name: app

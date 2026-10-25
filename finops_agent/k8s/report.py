@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -47,7 +48,7 @@ article.card h3{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size
 .part p{margin:4px 0}.part ul{margin:4px 0;padding-left:20px}.kv{display:grid;grid-template-columns:max-content 1fr;gap:2px 14px;margin:4px 0}
 .kv dt{color:var(--muted)}.kv dd{margin:0}pre.cmd{white-space:pre-wrap;word-break:break-all;background:var(--bg);border:1px solid var(--line);
 border-radius:6px;padding:8px;font-size:12px;margin:4px 0}.llm{border:1px dashed var(--line);border-radius:6px;padding:8px 10px;margin:8px 0;background:var(--bg)}
-.llm .tag{color:var(--accent)}.note{font-size:13px;color:var(--muted)}.good{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.money{font-size:15px;margin:4px 0 8px}.llm .tag{color:var(--accent)}.note{font-size:13px;color:var(--muted)}.good{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.chips span{border:1px solid var(--line);border-radius:999px;padding:2px 12px;font-size:13px}
 td.q code{display:block;max-width:420px}@media (max-width:600px){.legend dl,.kv{grid-template-columns:1fr}.legend dt{margin-top:6px}}
 """
@@ -120,26 +121,18 @@ def _plans_by_decision(inputs) -> dict:
 
 
 def ledger(inputs) -> tuple[list[dict], bool | None]:
-    """-> (entries, safe_halt). Accepts proposals as a list or as a dict keyed by `namespace/workload/resource`."""
+    """-> (proposals, safe_halt) from runs/k8s_state.json as ledger.py writes it:
+    {version, safe_halt, halt, last_run, proposals: [{plan_id, key, namespace, workload, resource, verdict, target, status, history[{status, ...}]}]}."""
     st = inputs.get("state")
     if not isinstance(st, dict):
         return [], None
-    props = st.get("proposals", st.get("entries", []))
-    out = []
-    items = props.items() if isinstance(props, dict) else enumerate(props or [])
-    for k, e in items:
-        e = dict(e)
-        if isinstance(k, str) and k.count("/") == 2 and not e.get("workload"):
-            e["namespace"], e["workload"], e["resource"] = k.split("/")
-        out.append(e)
-    return out, bool(st.get("safe_halt")) if "safe_halt" in st else None
+    return list(st.get("proposals") or []), bool(st["safe_halt"]) if "safe_halt" in st else None
 
 
 def ledger_state(entries, d) -> str | None:
-    for e in entries:
-        if (e.get("namespace"), e.get("workload"), e.get("resource")) == (d.get("namespace"), d.get("workload"), d.get("resource")):
-            return e.get("state")
-    return None
+    """Status of the newest proposal for this decision's workload/resource (a key can have older expired / rolled-back ones)."""
+    mine = [e for e in entries if (e.get("namespace"), e.get("workload"), e.get("resource")) == (d.get("namespace"), d.get("workload"), d.get("resource"))]
+    return mine[-1].get("status") if mine else None
 
 
 def final_actions(actions) -> list[dict]:
@@ -164,11 +157,11 @@ def quality(inputs) -> dict:
     real = sum(v.get("realized_usd_month") or 0 for v in verify)
     score = inputs.get("score")
     refused = None
-    if isinstance(score, dict) and isinstance(score.get("items"), list):
-        hi = [i for i in score["items"] if i.get("expect") in ("DENY", "UNKNOWN")]
-        refused = {"correct": sum(1 for i in hi if i.get("got") in ("DENY", "UNKNOWN")), "total": len(hi), "checked": True}
+    if isinstance(score, dict) and isinstance(score.get("n"), dict) and score.get("unknown_recall") is not None:
+        tot = score["n"].get("unknown_expected") or 0     # eval/score_k8s.py: the exam's UNKNOWN items and the share the agent got
+        refused = {"correct": round(score["unknown_recall"] * tot), "total": tot, "checked": True}
     elif decs:
-        k = verdicts["DENY"] + verdicts["UNKNOWN"]
+        k = verdicts["UNKNOWN"]
         refused = {"correct": k, "total": k, "checked": False}
     return {
         "verdicts": verdicts, "n_decisions": len(decs),
@@ -177,7 +170,7 @@ def quality(inputs) -> dict:
         "verified_net": sum(v.get("realized_usd_month") or 0 for v in verify if v.get("slo_ok")),
         "reached": len(reached), "rollback_rate": len(rolled) / len(reached) if reached else None,
         "safe_rate": len(safe) / len(reached) if reached else None,
-        "gate_refused": sum(1 for a in fin if a.get("outcome") == "refused"),
+        "gate_refused": sum(1 for a in inputs.get("actions") or [] if a.get("outcome") == "refused"),   # every attempt the gates stopped
         "refused": refused,
     }
 
@@ -274,7 +267,7 @@ def compare(inputs) -> str:
         h.append(f"<ul>{''.join(li)}</ul>")
     else:
         h.append("<p class=note>没有上次的决策文件，只能按台账看。</p>")
-    exp = [e for e in entries if e.get("state") == "expired"]
+    exp = [e for e in entries if e.get("status") == "expired"]
     if entries:
         h.append(f"<p>台账里已过期的提案 {len(exp)}" + (
             "：" + _e("、".join(f"{e.get('namespace')}/{e.get('workload')}/{e.get('resource')}" for e in exp)) if exp else "") + "</p>")
@@ -312,19 +305,75 @@ def sec_status(d) -> str:
     return _kv(rows)
 
 
+_QUANTILE = re.compile(r"quantile_over_time\(0\.(\d+)")
+_SLO_CATALOG = {"deadline_seconds": "批任务 deadline（SLO 目录，秒）", "availability": "可用性目标（SLO 目录）",
+                "p99_seconds": "p99 延迟目标（SLO 目录，秒）"}
+_STATIC = [("kube_pod_container_resource_limits", "当前 limit"), ("kube_deployment_spec_replicas", "副本数"),
+           ("cfs_throttled_periods_total", "高峰期 CPU throttle 比例（被限流的周期 / 总周期）"),
+           ("last_terminated_reason", "OOMKilled 次数（窗口内）"),
+           ("horizontalpodautoscaler_spec_target_metric", "HPA 目标指标"),
+           ("horizontalpodautoscaler_status_current_replicas", "HPA 当前副本数"),
+           ("horizontalpodautoscaler_spec_max_replicas", "HPA 最大副本数"),
+           ("slo_burn_rate_1h", "SLO 近一小时燃烧率（1 表示刚好烧完预算的速度）"),
+           ("slo_error_budget_remaining_ratio", "剩余错误预算比例"),
+           ("job_last_duration_seconds", "批任务最长耗时（秒）")]
+HOURLY_ORDER = ("有效天数（至少有一个小时有数据的天数）", "覆盖率（有数据的小时占窗口总小时的比例）", "高峰小时（UTC，使用量接近峰值的小时）")
+
+
+def evidence_labels(evs) -> dict:
+    """id -> human label, derived from the query text and window (the evidence entries themselves are part of the narration
+    prompt, which cassettes are keyed on, so labels are not stored in them). The three entries that share one hourly query are
+    told apart by their order, which is the order finops_agent.k8s.collect writes them: valid_days, coverage, peak_hours."""
+    out, hourly = {}, {}
+    for e in evs:
+        q, w = str(e.get("query")), str(e.get("window"))
+        label = None
+        if q.startswith("slo_catalog:"):
+            label = _SLO_CATALOG.get(q.rsplit(".", 1)[-1])
+        elif "kube_pod_container_resource_requests" in q:
+            cpu = 'resource="cpu"' in q
+            label = "当前 request" if "workload=" in q else f"集群里设了{'CPU' if cpu else '内存'} request 的 pod 数"
+        elif "kube_pod_status_phase" in q:
+            label = "集群里 Pending 的 pod 数"
+        elif "kube_node_status_allocatable" in q:
+            label = ("节点数" if q.startswith("count(") else
+                     "单节点可分配 CPU（core）" if 'resource="cpu"' in q else "单节点可分配内存（GiB）")
+        elif w.endswith("@1h") and "cfs_" not in q:
+            i = hourly.get((q, w), 0)
+            hourly[(q, w)] = i + 1
+            label = HOURLY_ORDER[i] if i < len(HOURLY_ORDER) else None
+        elif _QUANTILE.search(q):
+            label = "使用量 p" + _QUANTILE.search(q).group(1).ljust(2, "0")
+        elif "max_over_time(container_" in q:
+            label = "使用量 max（窗口内最大值）"
+        else:
+            label = next((t for k, t in _STATIC if k in q), None)
+        out[e["id"]] = label
+    return out
+
+
+def _ev_value(e) -> str:
+    v = e.get("value")
+    if isinstance(v, list):
+        return _e(_peak_hours(v))
+    return n(v)
+
+
 def sec_evidence(d) -> str:
     u, conds = d.get("usage", {}), d.get("conditions", {})
     used = {i for c in conds.values() for i in c.get("evidence", [])}
     ev = [e for e in d.get("evidence", []) if e["id"] in used] or d.get("evidence", [])
+    labels = evidence_labels(d.get("evidence", []))
+    shown = [e for e in ev if e.get("value") is not None]    # no value = this workload has no such thing (no HPA, not a batch job, ...)
+    hidden = len(ev) - len(shown)
     comp = f"有效天数 {n(u.get('valid_days'))}，覆盖率 {n(u.get('coverage'))}"
-    rows = []
-    for e in ev:
-        windowed = e.get("window") not in (None, "instant")
-        rows.append([_e(e["id"]), f"<code>{_e(e.get('query'))}</code>", _e(e.get("window")), n(e.get("value")),
-                     _e(comp) if windowed else "瞬时值"])
+    rows = [[_e(e["id"]), _e(labels.get(e["id"]) or "（未标注）"), f"<b>{_ev_value(e)}</b>", _e(e.get("window")),
+             f"<code>{_e(e.get('query'))}</code>"] for e in shown]
     cond_a = conds.get("A", {})
-    return (f"<p>数据完整度：{_e(cond_a.get('why', comp))}</p><details><summary>展开证据表（只列判定用到的）</summary>"
-            + wrap_table(["证据", "查询", "窗口", "值", "数据完整度"], rows) + "</details>")
+    return (f"<p>数据完整度：{_e(cond_a.get('why', comp))}</p><details><summary>展开证据表（只列判定用到、且有值的）</summary>"
+            + wrap_table(["证据", "含义", "值", "窗口", "查询"], rows)
+            + (f"<p class=note>另有 {hidden} 条被判定引用的证据没有值（这个 workload 没有对应的东西，例如没有 HPA 或不是批任务），不列出。</p>" if hidden else "")
+            + "</details>")
 
 
 def sec_analysis(d) -> str:
@@ -359,6 +408,20 @@ def sec_how(d, plan) -> str:
     return "".join(out)
 
 
+def money_line(d) -> str:
+    """One plain sentence: does money move if this is done, and why."""
+    sv = d.get("savings", {})
+    real, rv = sv.get("realizable_usd_month") or 0, sv.get("request_value_usd_month")
+    lead = "这条要你拍板，批准并做完后：" if d.get("verdict") == "REQUIRE_APPROVAL" else ""
+    if real > 0:
+        body = (f"<b class=good>钱会动</b>：节点数从 {n(sv.get('nodes_before'))} 降到 {n(sv.get('nodes_after'))}，每月省 {usd(real)}。"
+                "前提是这几台节点真的被缩掉；只改 request、节点没缩，账单不变。")
+    else:
+        body = (f"<b>钱不会动</b>：request 降了（账面少预留 {usd(rv)}/月），但节点数还是 {n(sv.get('nodes_before'))} 个，账单不变。"
+                "这一条的意义是把预留还给调度器，不是省钱。")
+    return f"<p class=money>{lead}{body}</p>"
+
+
 def sec_after(d) -> str:
     rec, c, u, sv = d.get("recommendation", {}), d.get("current", {}), d.get("usage", {}), d.get("savings", {})
     new = rec.get("request")
@@ -382,16 +445,25 @@ def sec_after(d) -> str:
         rows.append(("节点能缩才兑现的钱", f"<b class=good>{usd(real)}/月</b>，条件：节点数从 {n(nb)} 到 {n(na)}"))
     else:
         rows.append(("节点能缩才兑现的钱", f"<b>{usd(0)}/月</b>：降了预留但节点数下不来，所以账单不变（仍是 {n(nb)} 个节点）"))
-    return _kv(rows)
+    return money_line(d) + _kv(rows)
 
 
 def sec_verdict(d) -> str:
     out = [f"<p>{badge(d.get('verdict'))} {_e('；'.join(d.get('reasons') or []))}</p>"]
     nar = d.get("narrative")
-    if isinstance(nar, dict):
-        nar = nar.get("text") or " ".join(str(v) for v in nar.values())
-    if nar:
-        out.append(f"<div class=llm><span class=tag>LLM 撰写，已做证据落地校验（文中数字必须能在上面的证据里找到）</span><p>{_e(nar)}</p></div>")
+    if isinstance(nar, dict) and isinstance(nar.get("why"), dict):
+        tag = ("由模型撰写、数字已核对（文中每个数字都能在证据里找到；判定本身由规则给出，不是模型定的）" if nar.get("source") == "llm"
+               else "由模板生成，数字取自证据（没有调用模型）")
+        why = nar["why"]
+        parts = [f"<p><b>现状</b> {_e(why.get('status'))}</p>", f"<p><b>证据</b> {_e(why.get('evidence'))}</p>",
+                 f"<p><b>结论</b> {_e(why.get('conclusion'))}</p>"]
+        if nar.get("proposal"):
+            parts.append(f"<p><b>提案</b> {_e(nar['proposal'])}</p>")
+        if nar.get("would_change"):
+            parts.append("<p><b>什么情况下判定会变</b></p><ul>" + "".join(f"<li>{_e(w)}</li>" for w in nar["would_change"]) + "</ul>")
+        if nar.get("evidence"):
+            parts.append(f"<p class=note>引用证据：{_e('、'.join(nar['evidence']))}</p>")
+        out.append(f"<div class=llm><span class=tag>{tag}</span>{''.join(parts)}</div>")
     return "".join(out)
 
 
@@ -468,18 +540,32 @@ def _observed(a) -> str:
     return _e("；".join(parts)) or "—"
 
 
+def _ledger_cell(a) -> str:
+    led = a.get("ledger")
+    if not isinstance(led, dict):
+        return "<span class=note>不变</span>" if a.get("outcome") == "refused" else "—"
+    if led.get("status"):
+        return _e(STATE_ZH.get(led["status"], led["status"]))
+    return f"<span class=warn>没写成：{_e(led.get('error') or led.get('note') or '')}</span>"
+
+
 def weekly_actions(inputs) -> str:
     acts = inputs.get("actions")
     if not acts:
         return "<h2>已执行的变更</h2>" + missing("执行记录", "runs/<id>/k8s_actions.jsonl")
-    fin = final_actions(acts)
+    fin = final_actions([a for a in acts if a.get("outcome") != "refused"])   # last real outcome per plan; gate refusals are listed apart
+    refused = [a for a in acts if a.get("outcome") == "refused"]
     c = Counter(a.get("outcome") for a in fin)
     chips = "".join(f"<span>{OUTCOME_ZH[k]} {c[k]}</span>" for k in OUTCOME_ZH if c[k])
+    chips += f"<span>闸门拦下 {len(refused)} 次</span>" if refused else ""
     rows = [[f"<b>{_e(a.get('plan_id'))}</b>", f"<span class='v v-{OUTCOME_CLS.get(a.get('outcome'), 'mute')}'>{_e(OUTCOME_ZH.get(a.get('outcome'), a.get('outcome')))}</span>",
-             _e(a.get("reason")), _observed(a), _e(a.get("started_at"))] for a in fin]
-    return ("<h2>已执行的变更</h2>" + f"<div class=chips>{chips}</div>"
-            + wrap_table(["plan", "结果", "原因", "观察值", "开始时间"], rows)
-            + "<p class=note>每个 plan 只列最后一条记录。「已应用，观察中」说明观察期还没结束或进程中断。「被拒绝」是闸门在起作用，不是故障。</p>")
+             _e(a.get("reason")), _observed(a), _ledger_cell(a), _e(a.get("started_at"))] for a in fin]
+    out = ["<h2>已执行的变更</h2>", f"<div class=chips>{chips}</div>", wrap_table(["plan", "结果", "原因", "观察值", "台账", "开始时间"], rows),
+           "<p class=note>每个 plan 只列最后一条记录。「已应用，观察中」说明观察期还没结束或进程中断。</p>"]
+    if refused:
+        out.append("<h3>闸门拦下的尝试</h3>" + wrap_table(["plan", "原因", "时间"], [[_e(a.get("plan_id")), _e(a.get("reason")), _e(a.get("started_at"))] for a in refused])
+                   + "<p class=note>被拦下是闸门在起作用，不是故障；集群没有被动过，台账状态也不变。</p>")
+    return "".join(out)
 
 
 def weekly_verify(inputs) -> str:
@@ -498,6 +584,8 @@ def weekly_verify(inputs) -> str:
             dev.append([_e(x.get("plan_id")), _e(d.get("cause")), usd(d.get("usd")), _e(d.get("explanation"))])
     out = ["<h2>核实结果：预测 vs 实际</h2>",
            wrap_table(["plan", "预测 /月（牌价估算）", "实际 /月（核实后）", "实现率", "节点数", "SLO", "观察窗口"], rows)]
+    notes = sorted({x["note"] for x in v if x.get("note")})
+    out += [f"<p class=note><b>注：</b>{_e(t)}</p>" for t in notes]
     out.append("<h3>偏差按原因拆开</h3>" + (wrap_table(["plan", "原因", "金额 /月", "解释"], dev) if dev else "<p class=note>没有记录偏差。</p>"))
     return "".join(out)
 
@@ -506,7 +594,7 @@ def weekly_rollbacks(inputs) -> str:
     fin = final_actions(inputs.get("actions"))
     rolled = [a for a in fin if a.get("outcome") == "rolled_back"]
     entries, halt = ledger(inputs)
-    halted = [e for e in entries if e.get("state") == "halted"]
+    halted = [e for e in entries if e.get("status") == "halted"]
     out = ["<h2>回滚与 halt</h2>"]
     out.append("<p>safe_halt：" + ("<b class=bad>已置位</b>" if halt else "未置位" if halt is not None else "<span class=note>没有台账，未知</span>") + "</p>")
     if rolled:
@@ -521,11 +609,11 @@ def weekly_rollbacks(inputs) -> str:
 def ledger_flow(entries) -> dict:
     reach = Counter()
     for e in entries:
-        seen = {h.get("state") for h in e.get("history") or []} | {e.get("state")}
+        seen = {h.get("status") for h in e.get("history") or []} | {e.get("status")}
         top = max((FLOW.index(s) for s in seen if s in FLOW), default=-1)
         for s in FLOW[: top + 1]:
             reach[s] += 1
-    cur = Counter(e.get("state") for e in entries)
+    cur = Counter(e.get("status") for e in entries)
     return {"reached": reach, "current": cur, "total": len(entries)}
 
 
@@ -536,8 +624,13 @@ def weekly_ledger(inputs) -> str:
     f = ledger_flow(entries)
     flow = "".join(f"<span>{STATE_ZH[s]} {f['reached'][s]}</span>" for s in FLOW)
     side = "".join(f"<span>{STATE_ZH[s]} {f['current'][s]}</span>" for s in ("rolled_back", "expired", "halted"))
+    moved = [e for e in entries if any(h.get("status") in ("approved", "applied", "verified", "rolled_back", "halted") for h in e.get("history") or [])]
+    rows = [[f"<b>{_e(e.get('plan_id'))}</b>", " → ".join(_e(STATE_ZH.get(h.get("status"), h.get("status"))) for h in e.get("history") or []),
+             _e(((e.get("history") or [{}])[-1]).get("note", ""))] for e in moved]
     return (f"<h2>台账流转</h2><p>共 {f['total']} 条提案。「到达」指走到过这一步（含已走过的）。</p>"
-            f"<div class=chips>{flow}</div><div class=chips>{side}</div>")
+            f"<div class=chips>{flow}</div><div class=chips>{side}</div>"
+            + ("<h3>已经动过手的提案：走过的路</h3>" + wrap_table(["plan", "状态流转", "最后一条备注"], rows) if rows else
+               "<p class=note>还没有提案走到批准或执行。</p>"))
 
 
 def weekly(inputs) -> str:
@@ -576,8 +669,8 @@ def monthly(inputs) -> str:
         ["实现率", pct(q["realization"]) if q["realization"] is not None else "没有核实记录", "Σ实际 / Σ预测。低于 80% 说明预测系统性偏乐观"],
         ["回滚率", pct(q["rollback_rate"]) if q["rollback_rate"] is not None else "没有执行记录", f"回滚的 plan / 已触达集群的 plan（{q['reached']}）"],
         ["安全执行率", pct(q["safe_rate"]) if q["safe_rate"] is not None else "没有执行记录", "已触达集群的 plan 里，验证通过、没回滚、没失败、SLO 没退化的占比"],
-        ["正确拒绝的高风险", "—" if not rf else f"{rf['correct']} / {rf['total']}" + ("" if rf["checked"] else "（未对照考卷，仅为 DENY/UNKNOWN 条数）"),
-         f"考卷里应拒绝的条目，agent 判成 DENY 或 UNKNOWN 的数量。另有执行闸门拒绝 {q['gate_refused']} 次"],
+        ["数据不够时说不知道", "—" if not rf else f"{rf['correct']} / {rf['total']}" + ("" if rf["checked"] else "（未对照考卷，仅为 UNKNOWN 条数）"),
+         f"考卷里应判 UNKNOWN 的条目，agent 也判成 UNKNOWN 的数量（宁可说不知道，不能硬判）。另有执行闸门拒绝 {q['gate_refused']} 次"],
     ]
     body.append(wrap_table(["指标", "值", "含义"], rows))
     sc = inputs.get("score")
@@ -586,7 +679,15 @@ def monthly(inputs) -> str:
                 "它回答的是「在已知答案的题上，这套规则做对了多少」，不等于线上效果，所以要和上面的核实记录一起看。"
                 "预注册世界先冻结再只评一次，原始结果在 <code>eval/EXPERIMENTS.md</code>。</p>")
     if isinstance(sc, dict):
-        body.append(wrap_table(["指标", "值"], [[_e(k), n(sc[k])] for k in ("n", "verdict_accuracy", "unsafe_allow", "unknown_recall", "request_in_range", "realizable_accuracy") if sc.get(k) is not None]))
+        nn = sc.get("n") if isinstance(sc.get("n"), dict) else {}
+        meaning = {"verdict_accuracy": "判定和标准答案一致的比例", "unsafe_allow": "应拒绝或数据不足却判 ALLOW 的条数，硬闸为 0",
+                   "unknown_recall": "应判 UNKNOWN 的条目里判对的比例", "request_in_range": "ALLOW/需批准的推荐值落在标准区间内的比例",
+                   "realizable_accuracy": "节点能缩才兑现的金额落在标准区间内的比例"}
+        rows = [["考卷题数", n(nn.get("expected")), "世界文件里写了标准答案的 (workload, 资源) 条数"]]
+        rows += [[_e(k), n(sc[k]), meaning[k]] for k in meaning if sc.get(k) is not None]
+        if isinstance(sc.get("narrative_ungrounded"), list):
+            rows.append(["narrative_ungrounded", n(len(sc["narrative_ungrounded"])), "模型文字里出现、但在证据里找不到的数字条数，硬闸为 0"])
+        body.append(wrap_table(["指标", "值", "含义"], rows))
     else:
         body.append("<p class=note>这次没有给 --score，所以不显示分数。</p>")
     return page("monthly", inputs, "".join(body))
@@ -604,16 +705,18 @@ def _read_json(p):
     return json.loads(p.read_text()) if p.is_file() else None
 
 
-def load_inputs(run, prev=None, state=None, score=None) -> dict:
+def load_inputs(run, prev=None, state=None, score=None, actions=None, verify=None) -> dict:
+    """runs/<id> files by their usual names; `actions` / `verify` / `score` / `state` paths override the defaults
+    (k8s_actions.jsonl and k8s_verify.json in the run dir; k8s_eval.json, what eval/score_k8s.py writes next to the decisions)."""
     run = Path(run)
-    actions = None
-    if (run / "k8s_actions.jsonl").is_file():
-        actions = [json.loads(x) for x in (run / "k8s_actions.jsonl").read_text().splitlines() if x.strip()]
+    ap = Path(actions) if actions else run / "k8s_actions.jsonl"
+    acts = [json.loads(x) for x in ap.read_text().splitlines() if x.strip()] if ap.is_file() else None
     return {"decisions": _read_json(run / "k8s_decisions.json"),
             "prev": _read_json(Path(prev) / "k8s_decisions.json") if prev else None,
             "plans": _read_json(run / "k8s_plans.json"), "state": _read_json(state) if state else None,
-            "actions": actions, "verify": _read_json(run / "k8s_verify.json"),
-            "unit_cost": _read_json(run / "k8s_unit_cost.json"), "score": _read_json(score) if score else None}
+            "actions": acts, "verify": _read_json(verify) if verify else _read_json(run / "k8s_verify.json"),
+            "unit_cost": _read_json(run / "k8s_unit_cost.json"),
+            "score": _read_json(score) if score else _read_json(run / "k8s_eval.json")}
 
 
 def main(argv=None) -> int:
@@ -621,11 +724,13 @@ def main(argv=None) -> int:
     ap.add_argument("--run", required=True, help="runs/<id> directory holding k8s_decisions.json etc.")
     ap.add_argument("--prev", help="previous runs/<id> directory (daily diff)")
     ap.add_argument("--state", help="runs/k8s_state.json (ledger)")
-    ap.add_argument("--score", help="eval score JSON (monthly)")
+    ap.add_argument("--score", help="eval score JSON (monthly); default runs/<id>/k8s_eval.json if present")
+    ap.add_argument("--actions", help="k8s_actions.jsonl (default: in the run directory)")
+    ap.add_argument("--verify", help="k8s_verify.json (default: in the run directory)")
     ap.add_argument("--view", required=True, choices=VIEWS)
     ap.add_argument("--out", help="output HTML file (default: stdout)")
     a = ap.parse_args(argv)
-    html = render(a.view, load_inputs(a.run, a.prev, a.state, a.score))
+    html = render(a.view, load_inputs(a.run, a.prev, a.state, a.score, a.actions, a.verify))
     if a.out:
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(html)

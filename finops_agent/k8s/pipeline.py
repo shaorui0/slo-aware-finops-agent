@@ -2,11 +2,13 @@
 
   SLO catalog (3rd input) + Prometheus  ->  collect  ->  decide (deterministic verdicts)
     ->  narrate (isolated LLM call per decision, record/replay, grounded)  ->  proposal ledger  ->  plans
-    ->  runs/<id>/{k8s_decisions.json, k8s_plans.json, k8s_summary.json, k8s_trace.jsonl} and runs/k8s_state.json
+    ->  runs/<id>/{k8s_decisions.json, k8s_plans.json, k8s_summary.json, k8s_trace.jsonl, k8s_{daily,weekly,monthly}.html}
+    and runs/k8s_state.json
 
 CLI (wired in finops_agent/__main__.py):
-  python3 -m finops_agent k8s run --prom URL --slos testenv/k8s_slos.yaml --nodes-from testenv/k8s_world.yaml --run-id k8s-local
+  python3 -m finops_agent k8s run --prom URL --slos testenv/k8s_slos.yaml --nodes-from testenv/k8s_world.yaml --run-id k8s-local [--prev-run runs/<id>] [--score k8s_eval.json]
   python3 -m finops_agent k8s mark --state runs/k8s_state.json --ref <plan_id|key> --status approved|applied|verified|rolled_back
+  python3 -m finops_agent k8s ledger --state runs/k8s_state.json [--only-moved]
   python3 -m finops_agent k8s clear-halt --state runs/k8s_state.json
 Read-only against the cluster and AWS; plans are JSON, nothing is executed.
 """
@@ -21,7 +23,7 @@ from pathlib import Path
 import yaml
 
 from finops_agent.collect import Trace
-from finops_agent.k8s import ledger, narrate, plans
+from finops_agent.k8s import ledger, narrate, plans, report
 from finops_agent.k8s.collect import Prom, collect_facts, load_slos
 from finops_agent.k8s.policy import decide, load_policy, write_decisions
 from finops_agent.llm import LLMClient
@@ -86,11 +88,13 @@ def run(args) -> Path:
     if not args.no_state:
         ledger.save_state(state_path, state)
 
+    rendered = render_reports(out, state, args)
+
     llm = [c for c in trace.calls if c.get("source") == "llm"]
     nar = Counter(d["narrative"]["source"] for d in decisions)
     summary = {"run_id": run_id, "as_of": as_of, "decisions": len(decisions), "verdicts": dict(sorted(Counter(verdicts.values()).items())),
                "ledger": ledger.counts(diff), "ledger_keys": {k: v for k, v in diff.items() if isinstance(v, list) and v},
-               "safe_halt": state["safe_halt"], "plans": len(plan_list), "plans_skipped": skipped,
+               "safe_halt": state["safe_halt"], "plans": len(plan_list), "plans_skipped": skipped, "reports": rendered,
                "narrative": dict(sorted(nar.items())),
                "llm": {"calls": len(llm), "mode": llm[0]["mode"] if llm else None, "tokens_in": sum(c["tokens_in"] for c in llm),
                        "tokens_out": sum(c["tokens_out"] for c in llm), "cost_usd": round(sum(c["cost_usd"] for c in llm), 6),
@@ -101,6 +105,29 @@ def run(args) -> Path:
           f"ledger {summary['ledger']}{', SAFE_HALT' if state['safe_halt'] else ''}, narrative {summary['narrative']}", file=sys.stderr)
     print(out / "k8s_decisions.json")
     return out
+
+
+def render_reports(out: Path, state: dict, args) -> list[str]:
+    """runs/<id>/k8s_{daily,weekly,monthly}.html. Inputs: this run's files, the ledger as just updated, the previous run
+    (--prev-run), and whatever is already in the run dir (k8s_actions.jsonl, k8s_verify.json, k8s_eval.json); --score overrides the score."""
+    inputs = report.load_inputs(out, prev=args.prev_run, state=None, score=args.score)
+    inputs["state"] = state
+    names = []
+    for view in report.VIEWS:
+        (out / f"k8s_{view}.html").write_text(report.render(view, inputs))
+        names.append(f"k8s_{view}.html")
+    return names
+
+
+def format_ledger(state: dict, only_moved: bool = False) -> str:
+    """Text dump of runs/k8s_state.json: status, plan id and the statuses each proposal went through."""
+    lines = [f"ledger: {len(state['proposals'])} proposals, safe_halt={'ON' if state['safe_halt'] else 'off'}"]
+    for p in state["proposals"]:
+        path = [h["status"] for h in p["history"]]
+        if only_moved and set(path) <= {"proposed", "expired"}:
+            continue
+        lines.append(f"  {p['status']:<11} {p['plan_id']:<38} {' -> '.join(path)}")
+    return "\n".join(lines)
 
 
 def add_parser(sub) -> None:
@@ -118,6 +145,8 @@ def add_parser(sub) -> None:
     r.add_argument("--run-id", default=None)
     r.add_argument("--state", default=str(ROOT / "runs" / "k8s_state.json"), help="proposal ledger")
     r.add_argument("--no-state", action="store_true")
+    r.add_argument("--prev-run", default=None, help="previous run directory (runs/<id>), for the daily report's comparison")
+    r.add_argument("--score", default=None, help="eval score JSON for the monthly report (default: <run dir>/k8s_eval.json if present)")
     r.add_argument("--world-label", default="k8s", help="written to decisions.world")
     r.add_argument("--narrate", choices=("llm", "template"), default="llm", help="llm: isolated call per decision (FINOPS_LLM_MODE=replay|record|live); template: deterministic")
     r.add_argument("--model", default=None)
@@ -126,6 +155,9 @@ def add_parser(sub) -> None:
     m.add_argument("--ref", required=True, help="plan_id, <ns>/<workload>/<resource> or decision id")
     m.add_argument("--status", required=True, choices=("approved", "applied", "verified", "rolled_back"))
     m.add_argument("--note", default="")
+    lg = ks.add_parser("ledger", help="print the proposal ledger: one line per proposal, with the path it has taken")
+    lg.add_argument("--state", default=str(ROOT / "runs" / "k8s_state.json"))
+    lg.add_argument("--only-moved", action="store_true", help="only proposals past `proposed` (approved / applied / verified / rolled_back / halted)")
     c = ks.add_parser("clear-halt", help="human clears safe_halt")
     c.add_argument("--state", default=str(ROOT / "runs" / "k8s_state.json"))
 
@@ -137,6 +169,8 @@ def dispatch(args) -> None:
         st = ledger.mark(ledger.load_state(args.state), args.ref, args.status, note=args.note)
         ledger.save_state(args.state, st)
         print(f"{args.ref} -> {args.status}")
+    elif args.k8s_cmd == "ledger":
+        print(format_ledger(ledger.load_state(args.state), only_moved=args.only_moved))
     elif args.k8s_cmd == "clear-halt":
         ledger.save_state(args.state, ledger.clear_halt(ledger.load_state(args.state)))
         print("safe_halt cleared")

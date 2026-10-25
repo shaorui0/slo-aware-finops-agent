@@ -1,6 +1,7 @@
 """End to end against the in-process k8s test world: catalog -> collect -> decide -> narrate -> ledger -> plans."""
 import io
 import json
+import re
 import tempfile
 import threading
 import unittest
@@ -118,6 +119,51 @@ class PipelineTest(unittest.TestCase):
             with redirect_stdout(io.StringIO()):
                 main(["k8s", "clear-halt", "--state", sp])
             self.assertFalse(ledger.load_state(sp)["safe_halt"])
+
+    def test_run_writes_three_reports(self):
+        with tempfile.TemporaryDirectory() as t:
+            out = self.go(t, "a")
+            for v, title in (("daily", "日报"), ("weekly", "周报"), ("monthly", "月报")):
+                html = (out / f"k8s_{v}.html").read_text()
+                self.assertIn(title, html)
+                self.assertNotIn(t, html)                    # no local paths
+                self.assertNotIn("/Users/", html)
+            daily = (out / "k8s_daily.html").read_text()
+            self.assertIn("台账：已提案", daily)              # the ledger as just updated
+            self.assertIn("没有上次的决策文件", daily)         # no --prev-run
+            self.assertIn("没有执行记录", (out / "k8s_weekly.html").read_text())
+            self.assertIn("这次没有给 --score", (out / "k8s_monthly.html").read_text())
+            self.assertEqual(json.loads((out / "k8s_summary.json").read_text())["reports"], ["k8s_daily.html", "k8s_weekly.html", "k8s_monthly.html"])
+
+    def test_reports_take_prev_run_actions_and_score(self):
+        with tempfile.TemporaryDirectory() as t:
+            a = self.go(t, "a")
+            (a / "k8s_eval.json").write_text(json.dumps({"verdict_accuracy": 1.0, "unsafe_allow": 0, "unknown_recall": 1.0,
+                                                          "n": {"expected": 18, "unknown_expected": 2}}))
+            sp = Path(t) / "k8s_state.json"
+            st = ledger.mark(ledger.mark(ledger.load_state(sp), "shop/api-steady/cpu", "approved"), "shop/api-steady/cpu", "applied")
+            ledger.save_state(sp, ledger.mark(st, "shop/api-steady/cpu", "verified"))
+            (a / "k8s_actions.jsonl").write_text(json.dumps({"plan_id": "P-K-shop-api-steady-cpu-0.25", "outcome": "verified", "reason": "ok",
+                                                              "started_at": "2026-10-26T00:00:00Z", "ledger": {"status": "verified"}}) + "\n")
+            out = self.go(t, "a", extra=("--prev-run", str(a)))      # same run dir as its own prev: reads its own actions and eval
+            self.assertIn("<b>不变</b> 18", (out / "k8s_daily.html").read_text())
+            self.assertIn("P-K-shop-api-steady-cpu-0.25", (out / "k8s_weekly.html").read_text())
+            self.assertIn("已验证", (out / "k8s_weekly.html").read_text())
+            self.assertIn("verdict_accuracy", (out / "k8s_monthly.html").read_text())
+
+    def test_ledger_dump_cli(self):
+        with tempfile.TemporaryDirectory() as t:
+            self.go(t)
+            sp = str(Path(t) / "k8s_state.json")
+            with redirect_stdout(io.StringIO()):
+                main(["k8s", "mark", "--state", sp, "--ref", "shop/api-steady/cpu", "--status", "approved"])
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                main(["k8s", "ledger", "--state", sp, "--only-moved"])
+            out = buf.getvalue()
+            self.assertIn("approved    P-K-shop-api-steady-cpu-0.25", out)
+            self.assertIn("proposed -> approved", out)
+            self.assertNotIn("hpa-managed", out)           # still `proposed`: hidden by --only-moved
 
 
 if __name__ == "__main__":

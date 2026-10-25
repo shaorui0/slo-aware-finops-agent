@@ -1,7 +1,21 @@
 [
-  {"plan_id": "P-K-shop-api-steady-cpu-250m", "decision_id": "K-shop-api-steady-cpu",
-   "predicted_usd_month": 140.16, "realized_usd_month": 131.52, "ratio": 0.9384,
-   "nodes_before": 6, "nodes_after": 5,
-   "deviations": [{"cause": "节点装箱碎片", "usd": -8.64, "explanation": "缩容后有一个 pod 被调度到新节点，空闲核数没有合并成一整台，少省了约 1.8 小时的节点费用"}],
-   "slo_ok": true, "window": "7d"}
+  {
+    "plan_id": "P-K-shop-api-steady-cpu-0.25",
+    "decision_id": "K-shop-api-steady-cpu",
+    "predicted_usd_month": 140.16,
+    "realized_usd_month": 131.52,
+    "ratio": 0.9384,
+    "nodes_before": 6,
+    "nodes_after": 5,
+    "deviations": [
+      {
+        "cause": "节点装箱碎片",
+        "usd": -8.64,
+        "explanation": "缩容后有一个 pod 被调度到新节点，空闲核数没有合并成一整台，少省了约 1.8 小时的节点费用"
+      }
+    ],
+    "slo_ok": true,
+    "window": "7d",
+    "note": "手写夹具：这一行不是真实核实结果，只是为了展示核实表的样子；真实的 k8s_verify.json 由核实 change 产出"
+  }
 ]

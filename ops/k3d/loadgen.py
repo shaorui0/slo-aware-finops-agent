@@ -6,7 +6,7 @@ import urllib.request
 
 TARGET = os.environ.get("TARGET", "http://api-steady:8080/")
 RPS = float(os.environ.get("RPS", "5"))
-WORKERS = 16
+WORKERS = int(os.environ.get("WORKERS", "16"))
 
 
 def worker():
@@ -24,6 +24,6 @@ def worker():
 for _ in range(WORKERS):
     threading.Thread(target=worker, daemon=True).start()
     time.sleep(1.0 / RPS)
-print(f"loadgen: {RPS} rps -> {TARGET}", flush=True)
+print(f"loadgen: {RPS} rps, {WORKERS} workers -> {TARGET}", flush=True)
 while True:
     time.sleep(3600)
