@@ -94,9 +94,9 @@ class Schema(unittest.TestCase):
                 lo, hi = e["request_range"]
                 self.assertLessEqual(lo, hi, (w["name"], res))
                 cur = self.w.request(w, res)
-                # NOOP: recommender is not below current. mem-near-oom/memory carries the same tension and is
-                # declared DENY on purpose (contract change request in the c0028 proposal).
-                if e["verdict"] != "NOOP" and (w["name"], res) != ("mem-near-oom", "memory"):
+                # Only proposals must sit below current; a DENY may be under-provisioned (mem-near-oom/memory,
+                # contract revision f307ec9: NOOP is checked after B's risk guards).
+                if e["verdict"] in ("ALLOW", "REQUIRE_APPROVAL"):
                     self.assertLess(lo, cur, (w["name"], res))
             self.assertIn("kind", w)
             self.assertLessEqual(w["replicas"], w.get("hpa", {}).get("max", w["replicas"]))
@@ -268,7 +268,7 @@ class Shapes(K8sServerCase):
                 cur = self.world.request(w, res)
                 if w["expect"][res]["verdict"] == "NOOP":
                     self.assertGreaterEqual(rec, cur, f"{n}/{res}")
-                elif (n, res) != ("mem-near-oom", "memory"):
+                elif w["expect"][res]["verdict"] in ("ALLOW", "REQUIRE_APPROVAL"):
                     self.assertLess(rec, cur, f"{n}/{res}")
 
 
