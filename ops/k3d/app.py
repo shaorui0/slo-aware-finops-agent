@@ -1,4 +1,6 @@
 """Demo workload: burns a fixed amount of CPU per request and reports latency and CFS throttling.
+One request is worked at a time (a single worker, like a CPU-bound service with one worker process); the others wait on a lock.
+The reported latency starts BEFORE the wait, so overload shows up as queueing in p99 instead of being hidden in the kernel backlog.
 
 GET /          -> do ~WORK_MS of CPU work, reply ok
 GET /healthz   -> ok
@@ -17,6 +19,7 @@ THR_WINDOW = 15
 lat, lock = [], threading.Lock()
 thr = []  # (t, nr_periods, nr_throttled)
 total = [0]
+work = threading.Lock()   # one request at a time
 
 
 def cpu_stat():
@@ -80,9 +83,10 @@ class H(BaseHTTPRequestHandler):
                 f"container_cpu_cfs_periods_total {s[0]}\n"
                 f"container_cpu_cfs_throttled_periods_total {s[1]}\n")
         t0 = time.time()
-        c0 = time.thread_time()
-        while (time.thread_time() - c0) * 1000 < WORK_MS:
-            pass
+        with work:
+            c0 = time.thread_time()
+            while (time.thread_time() - c0) * 1000 < WORK_MS:
+                pass
         with lock:
             lat.append((time.time(), time.time() - t0))
             total[0] += 1

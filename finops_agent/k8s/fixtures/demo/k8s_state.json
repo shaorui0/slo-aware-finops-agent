@@ -91,7 +91,7 @@
           "run_id": "act",
           "as_of": "2026-10-26T00:00:00Z",
           "status": "rolled_back",
-          "note": "stop condition p99_seconds > 0.3 (observed 0.6763); resources verified equal to before"
+          "note": "stop condition p99_seconds > 0.3 (observed 0.7506); resources verified equal to before"
         }
       ]
     },
