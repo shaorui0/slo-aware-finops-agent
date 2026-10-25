@@ -1,0 +1,13 @@
+# 对照：应用后 14 天，只有两条干净的变更，没有增长、回滚和 HPA。核实器在这里不应凭空造出偏差：
+# api-steady 实现率 100%，packing-trap 实际 0。
+scenario: {name: after_clean, base: testenv/k8s_world.yaml}
+cluster:
+  period: {end: "2026-11-09T00:00:00Z"}
+verify:
+  before: {start: "2026-10-19T00:00:00Z", end: "2026-10-26T00:00:00Z"}
+  after: {start: "2026-11-02T00:00:00Z", end: "2026-11-09T00:00:00Z"}
+add_events:
+  api-steady:
+    - {type: set_request, at: "2026-10-26T00:00:00Z", plan_id: P-K-shop-api-steady-cpu-0.25, resource: cpu, request: 0.25}
+  packing-trap:
+    - {type: set_request, at: "2026-10-26T06:00:00Z", plan_id: P-K-shop-packing-trap-cpu-0.2, resource: cpu, request: 0.2}
