@@ -5,9 +5,9 @@
 - [x] 1.4 提交 freeze，记下 sha；此前不运行 agent 与评分器
 
 ## 2. 评估（freeze 之后，一次）
-- [ ] 2.1 `eval/k8s_heldout.sh`
-- [ ] 2.2 跑一次（`claude` 可用则 `FINOPS_LLM_MODE=record`，新增 cassette，不改旧的），评分，原始输出落盘
-- [ ] 2.3 提交 eval，记下 sha
+- [x] 2.1 `eval/k8s_heldout.sh`
+- [x] 2.2 跑一次（`claude` 可用则 `FINOPS_LLM_MODE=record`，新增 cassette，不改旧的），评分，原始输出落盘
+- [x] 2.3 提交 eval，记下 sha
 
 ## 3. 结果与验收
 - [ ] 3.1 `eval/EXPERIMENTS.md` 追加「主线 K8s：预注册新世界」

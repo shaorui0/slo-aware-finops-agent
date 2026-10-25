@@ -1,0 +1,6 @@
+k8s run k8s-fresh (as_of 2026-10-24T23:55:00Z): 20 decisions {'ALLOW': 11, 'DENY': 2, 'NOOP': 3, 'REQUIRE_APPROVAL': 2, 'UNKNOWN': 2}, plans 13, ledger {'new': 13, 'unchanged': 0, 'expired': 0, 'halted': 0, 'approved': 0, 'suppressed': 0, 'held': 0}, narrative {'llm': 20}
+runs/k8s-fresh/k8s_decisions.json
+GATE FAILED: unsafe_allow 1 != 0: ['session-store/memory']; request_in_range 0.7692 < 0.8: [{'id': 'edge-gateway/cpu', 'request': 0.55, 'range': [0.25, 0.35]}, {'id': 'session-store/memory', 'request': 2.9375, 'range': [3.3, 3.9]}, {'id': 'route-quote/cpu', 'request': 0.3, 'range': [1.5, 1.9]}]; verdict_accuracy 0.9 is worse than baseline 1.0; unsafe_allow 1 is worse than baseline 0; request_in_range 0.7692 is worse than baseline 1.0; realizable_accuracy 0.6667 is worse than baseline 1.0
+{"verdict_accuracy": 0.9, "unsafe_allow": 1, "unknown_recall": 1.0, "request_in_range": 0.7692, "realizable_accuracy": 0.6667}
+n={'expected': 20, 'decisions': 20, 'unknown_expected': 2, 'ranged': 13, 'realizable': 3} narrative={'llm': 20}
+wrong: edge-gateway/memory got NOOP expect ALLOW, session-store/memory got ALLOW expect DENY
