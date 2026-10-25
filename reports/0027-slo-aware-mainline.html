@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>c0027-slo-aware-mainline</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">c0027-slo-aware-mainline</h1>
+</header>
+<h2 id="why">Why</h2>
+<p>维护者 10-25 的需求文档把首个可交付版本定成：K8s workload 的
+CPU/Memory requests 优化，以 SLO
+和容量为硬约束，以可验证的净节省为目标。现有仓库的方向是反的。它铺开了
+12 种 AWS 浪费（EBS、EIP、NAT、SP、tag、跨 AZ…），没有 K8s，没有
+requests，没有策略引擎，也没有执行与验证的闭环。维护者的口径是「要一个做深，不要面面俱到」：CPU
+和 memory 这一项能跑通、能持续跑通、讲得清，就够了。</p>
+<p>项目因此改名为 <strong>SLO-aware FinOps
+Agent</strong>。核心设计原则是：Metrics 描述资源实际发生了什么，SLO
+描述业务允许发生什么，Requests
+描述调度器应为工作负载预留多少资源，这三者不能互相替代。</p>
+<h2 id="what-changes">What Changes</h2>
+<ul>
+<li>改名，并把主线收窄到 K8s CPU/Memory
+requests。README、NARRATIVE、MATURITY 的标题与定位随之改写。</li>
+<li>现有 12 类 AWS
+检测器、<code>world.yaml</code>、<code>make eval</code> 保持可运行，CI
+不变。文档里把它们改称「附录：广度扫描（冻结）」。</li>
+<li><code>docs/REQUIREMENTS.md</code> 新增 R20（先深后广）和主线交付物
+K1–K8。</li>
+<li><code>docs/MATURITY.md</code> 新增 <code>k8s-depth</code>
+一节，列出带 verify 的 DoD。</li>
+<li>新增接口契约 <code>specs/k8s-mainline/spec.md</code>：世界文件
+schema、指标名、决策 JSON、执行计划、提案台账、判定规则。后续
+change（c0028 起）按这份契约并行实现。</li>
+</ul>
+<h2 id="capabilities">Capabilities</h2>
+<h3 id="new-capabilities">New Capabilities</h3>
+<ul>
+<li><code>k8s-mainline</code>：主线的接口契约。</li>
+</ul>
+<h3 id="modified-capabilities">Modified Capabilities</h3>
+<p>（无）</p>
+<h2 id="impact">Impact</h2>
+<p>本 change 只改文档和 openspec，不改代码，<code>make test</code> 与
+<code>make eval</code> 的数字不变。执行权限定为：人批准后，只在本地 k3d
+集群（context <code>k3d-finops-test</code>）执行；不涉及 AWS
+写操作。GitHub 仓库改名对外可见，走 escrow，本 change 不做。 #
+k8s-mainline：主线接口契约</p>
+<p>c0028 起的各个 change
+按这份契约并行实现。改契约需要先改这个文件，再改代码。</p>
+<h2 id="added-requirements">ADDED Requirements</h2>
+<h3 id="requirement-三者分离">Requirement: 三者分离</h3>
+<p>Metrics（实际发生了什么）、SLO（业务允许发生什么）、Requests（调度器预留多少）是三类独立输入，不能互相替代。任何一类缺失，都必须表现为某个条件
+UNKNOWN，不能用另一类去推断补齐。</p>
+<h4 id="scenario-没有-slo-时不拿利用率替代">Scenario: 没有 SLO
+时不拿利用率替代</h4>
+<ul>
+<li><strong>WHEN</strong> 一个 workload 的 CPU
+利用率长期很低，但没有定义 SLO</li>
+<li><strong>THEN</strong> 条件 C 为 UNKNOWN，verdict 不是 ALLOW</li>
+</ul>
+<h3 id="requirement-合成世界文件">Requirement: 合成世界文件</h3>
+<p><code>testenv/k8s_world.yaml</code>（以及同 schema
+的预注册世界、场景文件）至少包含以下字段：</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cluster</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at">name</span><span class="kw">,</span><span class="at"> </span><span class="fu">period</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at">start</span><span class="kw">,</span><span class="at"> end</span><span class="kw">},</span><span class="at"> </span><span class="fu">step_seconds</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="kw">}</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">pricing</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">node_type</span><span class="kw">:</span><span class="at"> m6i.xlarge</span><span class="kw">,</span><span class="at"> </span><span class="fu">node_hour_usd</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.192</span><span class="kw">,</span><span class="at"> </span><span class="fu">cpu_core_hour_usd</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.0316</span><span class="kw">,</span><span class="at"> </span><span class="fu">mem_gib_hour_usd</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.0041</span><span class="kw">}</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">nodes</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at">count</span><span class="kw">,</span><span class="at"> min</span><span class="kw">,</span><span class="at"> max</span><span class="kw">,</span><span class="at"> </span><span class="fu">allocatable</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="fl">3.8</span><span class="kw">,</span><span class="at"> </span><span class="fu">memory_gib</span><span class="kw">:</span><span class="at"> </span><span class="fl">14.5</span><span class="kw">}}</span><span class="co">   # 节点自动扩缩的上下限</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">workloads</span><span class="kw">:</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">name, namespace, team, kind</span><span class="kw">:</span><span class="at"> Deployment</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">replicas</span><span class="kw">:</span><span class="at"> </span><span class="ch">N</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">container</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at">name</span><span class="kw">,</span><span class="at"> </span><span class="fu">requests</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;2&quot;</span><span class="kw">,</span><span class="at"> </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;4Gi&quot;</span><span class="kw">},</span><span class="at"> </span><span class="fu">limits</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;4&quot;</span><span class="kw">,</span><span class="at"> </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;6Gi&quot;</span><span class="kw">}}</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">hpa</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">metric</span><span class="kw">:</span><span class="at"> cpu</span><span class="kw">,</span><span class="at"> </span><span class="fu">target_utilization</span><span class="kw">:</span><span class="at"> </span><span class="dv">70</span><span class="kw">,</span><span class="at"> </span><span class="fu">min</span><span class="kw">:</span><span class="at"> </span><span class="dv">2</span><span class="kw">,</span><span class="at"> </span><span class="fu">max</span><span class="kw">:</span><span class="at"> </span><span class="dv">10</span><span class="kw">}</span><span class="co">        # 可选</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">slo</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">availability</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.999</span><span class="kw">,</span><span class="at"> </span><span class="fu">p99_seconds</span><span class="kw">:</span><span class="at"> </span><span class="fl">0.2</span><span class="kw">,</span><span class="at"> </span><span class="fu">deadline_seconds</span><span class="kw">:</span><span class="at"> </span><span class="dv">7200</span><span class="kw">}</span><span class="co">  # 可选；缺失即「未定义 SLO」</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">profile</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at">...</span><span class="kw">}</span><span class="co">            # 生成 usage 的形状：基线、日周期、批窗口、内存峰、OOM 时刻等</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">data_days</span><span class="kw">:</span><span class="at"> </span><span class="dv">21</span><span class="co">             # 有指标的天数，少于 period 时从 period 末尾往前算</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">events</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">...</span><span class="kw">]</span><span class="co">             # 可选：漂移、OOM、错误预算燃烧等，带时间</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">expect</span><span class="kw">:</span><span class="co">                   # 标准答案，按资源分别给</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">cpu</span><span class="kw">:</span><span class="at">    </span><span class="kw">{</span><span class="fu">verdict</span><span class="kw">:</span><span class="at"> ALLOW|REQUIRE_APPROVAL|DENY|UNKNOWN|NOOP</span><span class="kw">,</span><span class="at"> </span><span class="fu">request_range</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">lo</span><span class="kw">,</span><span class="at"> hi</span><span class="kw">],</span><span class="at"> </span><span class="fu">why</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;...&quot;</span><span class="kw">}</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="fu">verdict</span><span class="kw">:</span><span class="at"> ...</span><span class="kw">,</span><span class="at"> </span><span class="fu">request_range</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">lo</span><span class="kw">,</span><span class="at"> hi</span><span class="kw">],</span><span class="at"> </span><span class="fu">why</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;...&quot;</span><span class="kw">}</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">traps</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">...</span><span class="kw">]</span><span class="co">                  # 看着能降、其实不能的那几条，各自指向 workload</span></span></code></pre></div>
+<h4 id="scenario-世界自洽">Scenario: 世界自洽</h4>
+<ul>
+<li><strong>WHEN</strong> 加载世界文件</li>
+<li><strong>THEN</strong> 每个 workload 的 <code>expect</code>
+两个资源都有值，<code>request_range</code> 的 lo ≤ hi，并且 lo 小于当前
+request（NOOP 除外）</li>
+</ul>
+<h3 id="requirement-指标名与标签">Requirement: 指标名与标签</h3>
+<p>test-metrics-server 以 <code>--world k8s</code>
+方式启动时，提供下列序列。标签至少包含
+<code>namespace</code>、<code>workload</code>、<code>pod</code>、<code>container</code>；节点级指标带
+<code>node</code>。<code>workload</code> 标签视为抓取时已做
+relabel。</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>指标</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>container_cpu_usage_seconds_total</code></td>
+<td>counter</td>
+<td>cAdvisor</td>
+</tr>
+<tr>
+<td><code>container_memory_working_set_bytes</code></td>
+<td>gauge</td>
+<td>cAdvisor</td>
+</tr>
+<tr>
+<td><code>container_cpu_cfs_periods_total</code> /
+<code>container_cpu_cfs_throttled_periods_total</code></td>
+<td>counter</td>
+<td>throttling 比例 = throttled / periods</td>
+</tr>
+<tr>
+<td><code>kube_pod_container_resource_requests</code> /
+<code>kube_pod_container_resource_limits</code></td>
+<td>gauge</td>
+<td>带
+<code>resource="cpu"\|"memory"</code>、<code>unit="core"\|"byte"</code></td>
+</tr>
+<tr>
+<td><code>kube_pod_container_status_restarts_total</code></td>
+<td>counter</td>
+<td></td>
+</tr>
+<tr>
+<td><code>kube_pod_container_status_last_terminated_reason</code></td>
+<td>gauge</td>
+<td>带 <code>reason="OOMKilled"</code></td>
+</tr>
+<tr>
+<td><code>kube_deployment_spec_replicas</code></td>
+<td>gauge</td>
+<td></td>
+</tr>
+<tr>
+<td><code>kube_horizontalpodautoscaler_spec_target_metric</code> /
+<code>kube_horizontalpodautoscaler_status_current_replicas</code> /
+<code>kube_horizontalpodautoscaler_spec_max_replicas</code></td>
+<td>gauge</td>
+<td>只有带 hpa 的 workload 才有</td>
+</tr>
+<tr>
+<td><code>kube_node_status_allocatable</code></td>
+<td>gauge</td>
+<td>带 <code>resource</code>、<code>node</code></td>
+</tr>
+<tr>
+<td><code>kube_pod_status_phase</code></td>
+<td>gauge</td>
+<td>带 <code>phase="Pending"</code> 等</td>
+</tr>
+<tr>
+<td><code>http_requests_total</code></td>
+<td>counter</td>
+<td>带 <code>code</code></td>
+</tr>
+<tr>
+<td><code>http_request_duration_p99_seconds</code></td>
+<td>gauge</td>
+<td>已预聚合（相当于 recording rule），避免实现 histogram_quantile</td>
+</tr>
+<tr>
+<td><code>slo_error_budget_remaining_ratio</code> /
+<code>slo_burn_rate_1h</code></td>
+<td>gauge</td>
+<td>只有定义了 SLO 的 workload 才有</td>
+</tr>
+<tr>
+<td><code>job_last_duration_seconds</code></td>
+<td>gauge</td>
+<td>批任务每次运行的完成时长</td>
+</tr>
+</tbody>
+</table>
+<p>查询只用 metrics_server 现有的 PromQL 子集。默认 <code>--world</code>
+仍是原来的 AWS 世界，附录不受影响。</p>
+<h3 id="requirement-推荐器确定性">Requirement: 推荐器（确定性）</h3>
+<p><code>finops_agent/k8s/recommend.py</code> 对每个 workload 的 cpu 和
+memory 各出一条推荐，参数从 <code>config/k8s_policy.yaml</code> 读取： -
+cpu：<code>quantile_over_time(0.99)</code> 的每 pod 使用量（core）乘
+<code>(1 + cpu_headroom)</code>，向上取整到 <code>cpu_step</code>。 -
+memory：窗口内最大 working set 乘
+<code>(1 + mem_headroom)</code>，向上取整到 <code>mem_step</code>。 -
+推荐值不低于当前值时，verdict 为 NOOP（无需调整）。</p>
+<h3 id="requirement-两种节省口径">Requirement: 两种节省口径</h3>
+<p>每条推荐给出两个金额，报告里两者都显示并写明口径： -
+<code>request_value_usd_month</code>：Δrequest × 单价 × 730 ×
+副本数，即「账面上释放了多少预留」。 -
+<code>realizable_usd_month</code>：对整个集群的 requests
+做装箱模拟（first-fit decreasing，节点 allocatable
+来自世界文件），算出只应用这一条变更时能少开几个节点，再乘以节点单价 ×
+730。节点数下不来时这个值为 0，这是 packing-trap 要测的点。</p>
+<h3 id="requirement-策略引擎确定性llm-不参与-verdict">Requirement:
+策略引擎（确定性，LLM 不参与 verdict）</h3>
+<p><code>finops_agent/k8s/policy.py</code>
+对每条推荐评四个条件，每个条件输出
+<code>{status: PASS|FAIL|UNKNOWN, why, evidence: [evidence id]}</code>：</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>条件</th>
+<th>含义</th>
+<th>PASS 的判据（阈值来自 <code>config/k8s_policy.yaml</code>）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A 数据足够</td>
+<td>历史数据覆盖峰值与周期</td>
+<td>有效天数 ≥ <code>min_days</code>（14），样本覆盖率 ≥
+<code>min_coverage</code>；不足为 UNKNOWN</td>
+</tr>
+<tr>
+<td>B 资源余量</td>
+<td>降配后仍能扛住峰值</td>
+<td>cpu：新 request ≥ p99 × (1+margin)，且高峰期 throttling 比例 &lt;
+<code>max_throttle</code>；memory：新 request ≥ 峰值 working set ×
+(1+margin)，窗口内无 OOMKilled，峰值 &lt; <code>oom_guard</code> ×
+limit；集群无 Pending</td>
+</tr>
+<tr>
+<td>C 服务健康</td>
+<td>SLO 允许变更</td>
+<td>定义了 SLO，<code>slo_burn_rate_1h</code> ≤
+1，<code>slo_error_budget_remaining_ratio</code> ≥
+<code>min_budget</code>；批任务的 <code>job_last_duration_seconds</code>
+最大值 ≤ <code>deadline_guard</code> × deadline；未定义 SLO 时为
+UNKNOWN</td>
+</tr>
+<tr>
+<td>D 可恢复</td>
+<td>能回滚，且回滚时有容量</td>
+<td>有变更前快照和回滚命令；按装箱模拟缩容后，集群空闲 allocatable ≥
+Δrequest × 副本数</td>
+</tr>
+</tbody>
+</table>
+<p>判定规则按顺序执行，命中第一条即停： 1. 推荐值不低于当前值 → NOOP 2.
+C = FAIL → DENY（服务正在退化，冻结优化） 3. A ≠ PASS →
+UNKNOWN，<code>unknown_needs</code> 写明补什么数据才能判 4. B = FAIL 或
+D = FAIL → DENY 5. 任一条件为 UNKNOWN，或存在 HPA 联动（hpa.metric
+是本资源）→ REQUIRE_APPROVAL 6. 其余 → ALLOW</p>
+<p>UNKNOWN 永远不被当成通过。</p>
+<h3 id="requirement-决策文件">Requirement: 决策文件</h3>
+<p>每次运行写 <code>runs/&lt;run_id&gt;/k8s_decisions.json</code>：</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;as_of&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;world&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;decisions&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;K-&lt;namespace&gt;-&lt;workload&gt;-&lt;resource&gt;&quot;</span><span class="fu">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;workload&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;namespace&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;team&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;resource&quot;</span><span class="fu">:</span> <span class="st">&quot;cpu|memory&quot;</span><span class="fu">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;current&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;request&quot;</span><span class="fu">:</span> <span class="fl">2.0</span><span class="fu">,</span> <span class="dt">&quot;limit&quot;</span><span class="fu">:</span> <span class="fl">4.0</span><span class="fu">,</span> <span class="dt">&quot;replicas&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span> <span class="dt">&quot;unit&quot;</span><span class="fu">:</span> <span class="st">&quot;core|GiB&quot;</span><span class="fu">},</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;usage&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;p50&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;p95&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;p99&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;max&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;valid_days&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;coverage&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;peak_hours_utc&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="er">..</span><span class="ot">]</span><span class="fu">,</span> <span class="dt">&quot;throttle_peak&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;oom_events&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">},</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;recommendation&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;request&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;method&quot;</span><span class="fu">:</span> <span class="st">&quot;p99*(1+0.3) ceil 0.05&quot;</span><span class="fu">,</span> <span class="dt">&quot;headroom&quot;</span><span class="fu">:</span> <span class="fl">0.3</span><span class="fu">},</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;savings&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;request_value_usd_month&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;realizable_usd_month&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;nodes_before&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;nodes_after&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">},</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;conditions&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;A&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;PASS&quot;</span><span class="fu">,</span> <span class="dt">&quot;why&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;evidence&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;E1&quot;</span><span class="ot">]</span><span class="fu">},</span> <span class="dt">&quot;B&quot;</span><span class="fu">:</span> <span class="fu">{},</span> <span class="dt">&quot;C&quot;</span><span class="fu">:</span> <span class="fu">{},</span> <span class="dt">&quot;D&quot;</span><span class="fu">:</span> <span class="fu">{}},</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;verdict&quot;</span><span class="fu">:</span> <span class="st">&quot;ALLOW&quot;</span><span class="fu">,</span> <span class="dt">&quot;reasons&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;...&quot;</span><span class="ot">]</span><span class="fu">,</span> <span class="dt">&quot;unknown_needs&quot;</span><span class="fu">:</span> <span class="ot">[]</span><span class="fu">,</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;hpa_coupled&quot;</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;evidence&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span><span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;E1&quot;</span><span class="fu">,</span> <span class="dt">&quot;query&quot;</span><span class="fu">:</span> <span class="st">&quot;&lt;PromQL&gt;&quot;</span><span class="fu">,</span> <span class="dt">&quot;window&quot;</span><span class="fu">:</span> <span class="st">&quot;14d&quot;</span><span class="fu">,</span> <span class="dt">&quot;value&quot;</span><span class="fu">:</span> <span class="fl">0.0</span><span class="fu">,</span> <span class="dt">&quot;source&quot;</span><span class="fu">:</span> <span class="st">&quot;prometheus&quot;</span><span class="fu">}</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;narrative&quot;</span><span class="fu">:</span> <span class="kw">null</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span><span class="ot">]</span><span class="fu">}</span></span></code></pre></div>
+<p>报告里出现的每个数字，都必须能在
+<code>evidence[].value</code>、<code>current</code>、<code>usage</code>、<code>recommendation</code>
+或 <code>savings</code> 里找到。<code>narrative</code> 由判断层填写，受
+<code>judge/validate.py</code> 的落地规则约束。</p>
+<h3 id="requirement-执行计划与-k3d-执行">Requirement: 执行计划与 k3d
+执行</h3>
+<p>只有 ALLOW 和 REQUIRE_APPROVAL 的决策会生成计划，写入
+<code>runs/&lt;run_id&gt;/k8s_plans.json</code>：</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">&quot;plan_id&quot;</span><span class="fu">:</span> <span class="st">&quot;P-&lt;decision id&gt;-&lt;target&gt;&quot;</span><span class="fu">,</span> <span class="dt">&quot;decision_id&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;context&quot;</span><span class="fu">:</span> <span class="st">&quot;k3d-finops-test&quot;</span><span class="fu">,</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;before&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;requests&quot;</span><span class="fu">:</span> <span class="fu">{},</span> <span class="dt">&quot;limits&quot;</span><span class="fu">:</span> <span class="fu">{},</span> <span class="dt">&quot;replicas&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">},</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;patch&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;spec&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;template&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;spec&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;containers&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span><span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;resources&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;requests&quot;</span><span class="fu">:</span> <span class="fu">{}}}</span><span class="ot">]</span><span class="fu">}}}},</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;apply_cmd&quot;</span><span class="fu">:</span> <span class="st">&quot;kubectl --context k3d-finops-test -n &lt;ns&gt; patch deploy &lt;w&gt; --type strategic -p &#39;&lt;json&gt;&#39;&quot;</span><span class="fu">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;rollback_cmd&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;canary&quot;</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">&quot;scope&quot;</span><span class="fu">:</span> <span class="st">&quot;one workload&quot;</span><span class="fu">},</span> <span class="dt">&quot;observe_seconds&quot;</span><span class="fu">:</span> <span class="dv">120</span><span class="fu">,</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;stop_conditions&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fu">{</span><span class="dt">&quot;signal&quot;</span><span class="fu">:</span> <span class="st">&quot;throttle_ratio|p99_seconds|oom_killed|restarts&quot;</span><span class="fu">,</span> <span class="dt">&quot;op&quot;</span><span class="fu">:</span> <span class="st">&quot;&gt;&quot;</span><span class="fu">,</span> <span class="dt">&quot;value&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">}</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a> <span class="dt">&quot;approval_file&quot;</span><span class="fu">:</span> <span class="st">&quot;runs/approvals/&lt;plan_id&gt;.approved&quot;</span><span class="fu">}</span></span></code></pre></div>
+<p><code>finops_agent/k8s/act.py</code> 必须满足以下五条： - approval
+文件不存在就不执行。 - <code>context</code> 不是
+<code>k3d-finops-test</code> 就不执行。 - 执行前重新读取当前资源；与
+<code>before</code> 不一致时视为状态漂移，不执行。 -
+观察期内命中任一停止条件就执行 <code>rollback_cmd</code>，并验证 rollout
+status。 - 每条 kubectl 写命令前带 <code># INTENT:</code> 行。</p>
+<p>项目 hook 拦截所有其他 context 上的 kubectl 写操作。</p>
+<h3 id="requirement-提案台账与持续运行">Requirement:
+提案台账与持续运行</h3>
+<p><code>runs/k8s_state.json</code> 按
+<code>(namespace, workload, resource)</code> 记一条提案，状态取值为
+<code>proposed | approved | applied | verified | rolled_back | expired | halted</code>。规则：
+- 目标值相同（差异 ≤ 5%）的重复运行不新增提案，只更新
+<code>last_seen</code>。 - 新一轮的 verdict 变了，或目标值相差超过
+5%，旧提案转为 expired 并新建提案。 - 已 applied 的 workload 观察到 SLO
+退化时，转为 halted，并在全局置
+<code>safe_halt: true</code>。之后的运行只报告不出计划，直到人工清除。</p>
+<h3 id="requirement-定期报告">Requirement: 定期报告</h3>
+<p><code>finops_agent/k8s/report.py</code>
+用同一份数据输出三个中文视图：日报、周报、月报。</p>
+<p>日报的每个候选一张卡片，固定六段： 1. 现状 2. 证据 3. 做了哪些分析 4.
+怎么做 5. 做完应该是什么样 6. 结论</p>
+<p>日报另有一行摘要、和上次比的差异，以及被拒清单。</p>
+<p>周报包含： - 已执行变更的预测与实际对比、实现率、偏差原因 - 回滚与
+halt 记录 - 台账流转</p>
+<p>月报包含： - 已验证净节省、单位成本 - agent
+自身质量：考卷成绩、unsafe ALLOW 数、实现率、回滚率</p>
+<h3 id="requirement-评估">Requirement: 评估</h3>
+<p><code>eval/score_k8s.py</code> 读决策文件和世界文件的
+<code>expect</code>，输出以下指标：</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>指标</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>verdict_accuracy</code></td>
+<td>按 (workload, resource) 计</td>
+</tr>
+<tr>
+<td><code>unsafe_allow</code></td>
+<td>expect 为 DENY 或 UNKNOWN 却给出 ALLOW 的条数。硬闸为 0，非 0
+时退出码非 0</td>
+</tr>
+<tr>
+<td><code>unknown_recall</code></td>
+<td>expect 为 UNKNOWN 的条数里判成 UNKNOWN 的比例</td>
+</tr>
+<tr>
+<td><code>request_in_range</code></td>
+<td>ALLOW 与 REQUIRE_APPROVAL 的推荐值落在 <code>request_range</code>
+内的比例</td>
+</tr>
+<tr>
+<td><code>realizable_accuracy</code></td>
+<td>可选。只有 expect 写了 realizable 区间时才计</td>
+</tr>
+</tbody>
+</table>
+<p>预注册世界 <code>testenv/heldout/k8s_fresh_world.yaml</code>
+先冻结、提交，之后只评一次，评估结果原样写进
+<code>eval/EXPERIMENTS.md</code>。 # c0027 验收证据</p>
+<h2 id="check_rules-docs">check_rules –docs</h2>
+<pre><code>check_rules: OK</code></pre>
+<h2 id="make-test本-change-不改代码">make test（本 change
+不改代码）</h2>
+<pre><code>Ran 3 tests in 0.067s
+OK
+Ran 29 tests in 5.078s
+OK
+Ran 160 tests in 20.858s
+OK
+Ran 35 tests in 17.317s
+OK
+Ran 35 tests in 5.738s
+OK</code></pre>
+<h2 id="make-eval附录数字不变">make eval（附录数字不变）</h2>
+<pre><code>{&quot;recall&quot;: 1.0, &quot;savings_recall&quot;: 1.0, &quot;precision&quot;: 1.0, &quot;savings_accuracy&quot;: 0.9167, &quot;step_agreement&quot;: 1.0, &quot;depth&quot;: {&quot;shallow_recall&quot;: 1.0, &quot;deep_recall&quot;: 1.0}, &quot;leads&quot;: 7}
+gates: pass</code></pre>
+</body>
+</html>
