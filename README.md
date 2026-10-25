@@ -228,6 +228,10 @@ open runs/local/report.html
 | c0030-k3d-act | 10-26 | kubectl/k3d guard（显式 context + INTENT）；act.py 审批、漂移、canary、观察、自动回滚、验证；本地 k3d 演示 | 写路径先定谁来拦；throttle 来自 limit 不来自 request | [报告](reports/0030-k3d-act.html) · [笔记](notes/blog/0030-k3d-act.md) |
 | c0031-k8s-pipeline | 10-26 | K8s 主线串联：SLO 目录作为第三输入 → collect → decide → 隔离 LLM 叙述（盒带回放、数字落地）→ 计划 → 提案台账；`make k8s-eval` 进 CI（18/18 判对、unsafe_allow 0），`make k8s-days` 三天连续运行 | deadline 属于 SLO 定义而不是指标，补上第三输入就从 16/18 到 18/18；LLM 只写叙述，句子级抹除而不是信任 | [报告](reports/0031-k8s-pipeline.html) · [笔记](notes/blog/0031-k8s-pipeline.md) |
 | c0032-k8s-report | 10-26 | k8s 日报/周报/月报：一份数据三个中文视图，六段卡片、被拒表、核实对比、质量指标；样例 HTML | 被拒与数据不足和省钱一样重要；报告里的数字逐个回指决策 JSON | [报告](reports/0032-k8s-report.html) · [笔记](notes/blog/0032-k8s-report.md) |
+| c0033-k8s-verify | 10-26 | 核实 K8s requests 变更：BEFORE/AFTER 节点小时账单，五类原因精确分解，逐条预测对实际 | 请求降了不等于账单降了：packing-trap 账面释放 $36.91，账单 0 | [报告](reports/0033-k8s-verify.html) · [笔记](notes/blog/0033-k8s-verify.md) |
+| c0034-k8s-loop | 10-26 | 执行回写台账、`k8s run` 出日/周/月三份报告、demo 改用流水线生成的计划；报告读真实台账与考卷，证据带人话标签 | 降 request 不会 throttle，demo 的回滚靠 p99 加注入过载，只证明守卫会触发，不证明因果 | [报告](reports/0034-k8s-loop.html) · [笔记](notes/blog/0034-k8s-loop.md) |
+| c0035-k8s-fresh-heldout | 10-26 | 预注册新 K8s 世界（10 个 workload、8 种新情形），冻结后评估一次；verdict_accuracy 1.0→0.90，unsafe_allow 1（内存泄漏趋势被判 ALLOW） | 样本内 1.0 是拟合；最危险的失败是契约没写的信息（趋势、sidecar、尖峰尾部） | [报告](reports/0035-k8s-fresh-heldout.html) · [笔记](notes/blog/0035-k8s-fresh-heldout.md) |
+| c0036-k8s-fresh2-freeze | 10-26 | 第二个预注册 K8s 世界（12 个 workload、c6i.2xlarge 定价）盲写并冻结，冻结 sha 10eefdb；未运行任何评估 | 用来找 bug 的世界不能度量修复，要在修复前盲写第二个；契约与 SRE 判断冲突处标 judgment_conflict 而不改答案 | [报告](reports/0036-k8s-fresh2-freeze.html) · [笔记](notes/blog/0036-k8s-fresh2-freeze.md) |
 
 ### 2.5 目录
 

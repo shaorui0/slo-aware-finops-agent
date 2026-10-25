@@ -578,12 +578,19 @@ def weekly_verify(inputs) -> str:
         r = x.get("ratio")
         cls = "good" if r is not None and r >= 0.8 else "warn"
         rows.append([f"<b>{_e(x.get('plan_id'))}</b>", usd(x.get("predicted_usd_month")), usd(x.get("realized_usd_month")),
-                     f"<span class={cls}>{pct(r)}</span>", f"{n(x.get('nodes_before'))} → {n(x.get('nodes_after'))}",
-                     "保持" if x.get("slo_ok") else "<span class=bad>退化</span>", _e(x.get("window"))])
+                     f"<span class={cls}>{pct(r)}</span>",
+                     "无 SLO，不可判" if x.get("slo_ok") is None else ("保持" if x.get("slo_ok") else "<span class=bad>退化</span>"),
+                     _e(x.get("window"))])
         for d in x.get("deviations") or []:
             dev.append([_e(x.get("plan_id")), _e(d.get("cause")), usd(d.get("usd")), _e(d.get("explanation"))])
+    # nodes_before/after in k8s_verify.json are whole-cluster counts, not one plan's contribution: show them once
+    nodes = sorted({(x.get("nodes_before"), x.get("nodes_after")) for x in v if x.get("nodes_before") is not None})
     out = ["<h2>核实结果：预测 vs 实际</h2>",
-           wrap_table(["plan", "预测 /月（牌价估算）", "实际 /月（核实后）", "实现率", "节点数", "SLO", "观察窗口"], rows)]
+           wrap_table(["plan", "预测 /月（牌价估算）", "实际 /月（核实后）", "实现率", "SLO", "观察窗口"], rows)]
+    if nodes:
+        out.append("<p class=note>集群整体节点数（核实窗口前后）："
+                   + "；".join(f"{n(a)} → {n(b)}" for a, b in nodes)
+                   + "。这是所有变更和无关增长合在一起的结果，不是某一条变更的贡献；每条变更各自的贡献看「实际」一列和下面的偏差拆分。</p>")
     notes = sorted({x["note"] for x in v if x.get("note")})
     out += [f"<p class=note><b>注：</b>{_e(t)}</p>" for t in notes]
     out.append("<h3>偏差按原因拆开</h3>" + (wrap_table(["plan", "原因", "金额 /月", "解释"], dev) if dev else "<p class=note>没有记录偏差。</p>"))

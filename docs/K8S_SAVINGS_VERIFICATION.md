@@ -96,3 +96,4 @@
 - 节点自动扩缩被简化成「每小时节点数 = FFD 结果」，没有缩容延迟，也没有 PodDisruptionBudget。真实集群里节点要空闲一段时间才会被回收。
 - 变更、回滚与扩容的时间线是场景文件里的事件（`testenv/k8s_scenarios/after_*.yaml`），指标服务器暂不吐出变更后的 requests；生产适配器应改读 `kube_pod_container_resource_requests` 的历史。
 - BEFORE 与 AFTER 之间留了一周让 HPA 与回滚落定，窗口越短，偏差越多来自噪声。
+- 场景是挑过的：`after_apply.yaml` 的无关增长幅度和变更应用顺序，是为了让每一类偏差各出现一次而选的（例如四条 cpu 变更挤在同一个吃紧的集群里时，只要增长需要新节点，packing-trap 就会变成决定性的那一条，实际节省不再是 0）。它证明核实器能把账单变化正确拆开，不证明这些偏差在真实集群里的比例。

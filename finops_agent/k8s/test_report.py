@@ -251,6 +251,19 @@ class WeeklyMonthlyTest(unittest.TestCase):
             p = R.render("weekly", inputs(verify=v))
             self.assertIn("本周没有已核实的变更", p)
 
+    def test_weekly_verify_nodes_are_cluster_level_and_no_slo_is_not_degraded(self):
+        i = inputs()
+        i["verify"] = [
+            {"plan_id": "P-a", "predicted_usd_month": 10.0, "realized_usd_month": 10.0, "ratio": 1.0, "nodes_before": 6,
+             "nodes_after": 5, "deviations": [], "slo_ok": True, "window": "7d"},
+            {"plan_id": "P-b", "predicted_usd_month": 0.0, "realized_usd_month": 0.0, "ratio": None, "nodes_before": 6,
+             "nodes_after": 5, "deviations": [], "slo_ok": None, "window": "7d"}]
+        p = text(R.render("weekly", i))
+        self.assertEqual(p.count("6 → 5"), 1)          # shown once, as the whole-cluster count
+        self.assertIn("集群整体节点数", p)
+        self.assertIn("无 SLO，不可判", p)
+        self.assertNotIn("退化", p.split("核实结果")[1].split("偏差按原因拆开")[0])
+
     def test_weekly_content(self):
         i = inputs(state=json.loads((FX / "demo/k8s_state.json").read_text()))
         p = text(R.render("weekly", i))
