@@ -1,0 +1,17 @@
+# SLO 目录：K8s 主线的第三个独立输入（Metrics / SLO / Requests 三者不能互相替代）。
+# 形状是 OpenSLO 的最小子集：每个 (namespace, workload) 一条，给目标，不给「现在烧了多少」。
+# 燃烧率与剩余预算由指标（recording rule）给；批任务的 deadline 只在这里。
+# 没有 SLO 的 workload 不出现在这里（k8s_world.yaml 里的 no-slo）。
+# 与 testenv/k8s_world.yaml 的 `slo` 块保持一致，由 testenv/test_k8s_slos.py 断言。
+apiVersion: finops.local/v1
+kind: SLOCatalog
+metadata: {name: finops-k8s-synth}
+slos:
+  - {namespace: shop, workload: api-steady, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: api-tidal, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: data, workload: batch-nightly, deadline_seconds: 7200}
+  - {namespace: shop, workload: mem-near-oom, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: burning-slo, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: new-service, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: hpa-managed, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: packing-trap, objectives: {availability: 0.999, p99_seconds: 0.3}}
