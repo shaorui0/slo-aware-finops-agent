@@ -1,0 +1,179 @@
+# Synthetic K8s world for the SLO-aware FinOps Agent mainline (c0028). Schema: c0027 k8s-mainline spec.
+# Served by `python3 -m testenv.metrics_server --world k8s`. The agent never reads this file; the eval reads `expect`.
+# Units: cpu in cores, memory in GiB. request_range values follow the recommender rule:
+#   cpu = p99 per-pod usage x 1.3, ceil 0.05 core;  memory = max working set x 1.2, ceil 64Mi;  range ~ +-10%.
+cluster:
+  name: finops-k8s-synth
+  period: {start: "2026-10-05T00:00:00Z", end: "2026-10-26T00:00:00Z"}   # 21 days
+  step_seconds: 300
+
+pricing: {node_type: m6i.xlarge, node_hour_usd: 0.192, cpu_core_hour_usd: 0.0316, mem_gib_hour_usd: 0.0041}
+
+nodes: {count: 6, min: 3, max: 10, allocatable: {cpu: 3.8, memory_gib: 14.5}}
+
+workloads:
+  - name: api-steady
+    namespace: shop
+    team: team-checkout
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.15, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.9, jitter: 0.04}
+      http: {rps: 20, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.225, 0.275], realizable_usd_month: [130, 150], why: "avg 15% flat, no peak; request 1.0 -> 0.25 core x3 pods frees one node when applied alone"}
+      memory: {verdict: ALLOW, request_range: [1.0, 1.25], why: "working set ~0.9 GiB flat, 2 GiB reserved"}
+
+  - name: api-tidal
+    namespace: shop
+    team: team-checkout
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "2", memory: "6Gi"}, limits: {cpu: "2", memory: "8Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: tidal, base: 0.12, amp: 1.1, peak_hour: 14, sigma_h: 1.5, spike_value: 1.8, spike_samples: 2, jitter: 0.04}
+      mem: {kind: flat, base_gib: 5.1, jitter: 0.01}
+      throttle: {onset: 0.45, slope: 1.0, cap: 0.6}
+      http: {rps: 20, p99_base: 0.12, p99_per_throttle: 1.0}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [1.5, 1.8], why: "average 15% but the daily peak reaches ~90% of request; throttling and p99 rise together at the peak (B fails)"}
+      memory: {verdict: NOOP, request_range: [6.0, 6.3], why: "max working set x1.2 is already about the current request"}
+
+  - name: batch-nightly
+    namespace: data
+    team: team-data
+    kind: Deployment
+    replicas: 1
+    container: {name: job, requests: {cpu: "2", memory: "4Gi"}, limits: {cpu: "2", memory: "6Gi"}}
+    slo: {deadline_seconds: 7200}
+    profile:
+      cpu: {kind: batch, start_hour: 2, hours: 2, active: 1.0, idle: 0.01, jitter: 0.03}
+      mem: {kind: batch, idle_gib: 0.3, active_gib: 1.2, jitter: 0.02}
+      job: {base_seconds: 6840, jitter_seconds: 100, finish_hour: 4.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [1.2, 1.5], why: "single-thread job saturates one core for 2h at 02:00 UTC; last run took ~95% of the 7200s deadline (C fails)"}
+      memory: {verdict: DENY, request_range: [1.35, 1.65], why: "same SLO guard: job duration is within 5% of the deadline, so no change is allowed"}
+
+  - name: mem-near-oom
+    namespace: shop
+    team: team-search
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "0.5", memory: "2Gi"}, limits: {cpu: "1", memory: "2Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.04, jitter: 0.1}
+      mem: {kind: leak, base_gib: 1.2, peak_gib: 1.88, cycle_hours: 48, jitter: 0.01}
+      http: {rps: 5, p99_base: 0.12}
+    data_days: 21
+    events:
+      - {type: oom, at: "2026-10-17T05:00:00Z", pod: 1}
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.09, 0.11], why: "cpu nearly idle (p99 ~0.05 core)"}
+      memory: {verdict: DENY, request_range: [2.2, 2.7], why: "working set peaks at >=90% of the limit and one OOMKilled in the window (B fails). NOTE: max ws x1.2 > current request, so rule 1 (NOOP) would fire first; see c0028 proposal, contract change request"}
+
+  - name: burning-slo
+    namespace: shop
+    team: team-pay
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.1, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.6, jitter: 0.04}
+      http: {rps: 10, p99_base: 0.12}
+    data_days: 21
+    events:
+      - {type: slo_burn, at: "2026-10-25T16:00:00Z", burn_rate: 2.4, budget_remaining: 0.12, ramp_hours: 8}
+    expect:
+      cpu: {verdict: DENY, request_range: [0.135, 0.165], why: "usage is low but slo_burn_rate_1h > 1 and error budget < 0.25 (C fails): freeze optimisation while the service degrades"}
+      memory: {verdict: DENY, request_range: [0.68, 0.83], why: "same C failure"}
+
+  - name: new-service
+    namespace: shop
+    team: team-growth
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "0.5", memory: "1Gi"}, limits: {cpu: "1", memory: "2Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.05, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.3, jitter: 0.04}
+      http: {rps: 5, p99_base: 0.12}
+    data_days: 5
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.09, 0.11], why: "only 5 days of data, below min_days (A unknown); needs >=14 days"}
+      memory: {verdict: UNKNOWN, request_range: [0.34, 0.42], why: "only 5 days of data (A unknown)"}
+
+  - name: no-slo
+    namespace: tools
+    team: team-internal
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    profile:
+      cpu: {kind: flat, base: 0.12, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.8, jitter: 0.04}
+      http: {rps: 4, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.18, 0.22], why: "usage is low and data is complete, but no SLO is defined: C is UNKNOWN, utilization must not stand in for it"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [0.9, 1.1], why: "C is UNKNOWN (no SLO)"}
+
+  - name: hpa-managed
+    namespace: shop
+    team: team-checkout
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    hpa: {metric: cpu, target_utilization: 70, min: 2, max: 6}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.3, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.9, jitter: 0.04}
+      http: {rps: 15, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.4, 0.5], why: "HPA scales on cpu utilization vs request: cutting the request changes the HPA operating point (coupling)"}
+      memory: {verdict: ALLOW, request_range: [1.0, 1.25], why: "HPA metric is cpu, memory is not coupled"}
+
+  - name: packing-trap
+    namespace: shop
+    team: team-search
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "8Gi"}, limits: {cpu: "2", memory: "10Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.12, jitter: 0.08}
+      mem: {kind: flat, base_gib: 6.7, jitter: 0.01}
+      http: {rps: 8, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.18, 0.22], realizable_usd_month: [0, 0], why: "cpu cut is safe, but 8 GiB memory requests still pin the nodes: first-fit decreasing needs the same node count, realizable savings are 0"}
+      memory: {verdict: NOOP, request_range: [8.0, 8.3], why: "max working set x1.2 is already about the current request"}
+
+traps:
+  - {workload: api-tidal, why: "average 15% looks wasteful, but the daily peak hits ~90% of request and throttles"}
+  - {workload: batch-nightly, why: "idle all day, but the 02:00 window saturates and the job is near its deadline"}
+  - {workload: mem-near-oom, why: "cpu idle, but memory working set sits near the limit and one OOMKilled happened"}
+  - {workload: burning-slo, why: "low usage, but the SLO is burning: do not touch a degrading service"}
+  - {workload: new-service, why: "5 days of data cannot show the weekly or peak pattern"}
+  - {workload: no-slo, why: "idle is not permission: without an SLO the verdict cannot be ALLOW"}
+  - {workload: hpa-managed, why: "request is the HPA denominator: lowering it makes the HPA scale out"}
+  - {workload: packing-trap, why: "request value drops, node count does not: realizable savings are 0"}

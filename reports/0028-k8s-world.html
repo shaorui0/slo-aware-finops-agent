@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0028-k8s-world</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0028-k8s-world</h1>
+</header>
+<h1 id="c0028-合成-k8s-世界报告">c0028 合成 K8s 世界报告</h1>
+<h2 id="改了什么">改了什么</h2>
+<ul>
+<li><code>testenv/k8s_world.yaml</code>：21 天、6 节点、9 个
+workload，cpu 与 memory 各有 <code>expect</code>，另有 8 条
+<code>traps</code>。</li>
+<li><code>testenv/k8s_world.py</code>：确定性生成器、<code>load(as_of=)</code>、场景叠加。</li>
+<li><code>testenv/metrics_server.py</code>：<code>--world k8s</code>、<code>--as-of</code>；默认
+AWS 世界不变，原有测试全绿。</li>
+<li><code>testenv/k8s_scenarios/drift_day3.yaml</code>：第 3
+天场景，api-steady 最后一天负载 +60%。</li>
+<li><code>testenv/test_k8s_world.py</code>：23 个测试。</li>
+</ul>
+<h2 id="为什么">为什么</h2>
+<p>后续的推荐器、策略引擎、执行与评估都要有一份标准答案已知的数据。先把世界做出来，几条线才能并行。</p>
+<h2 id="世界一览">世界一览</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>workload</th>
+<th>形状</th>
+<th>cpu expect</th>
+<th>memory expect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-steady</td>
+<td>平均 15%，无峰</td>
+<td>ALLOW，0.225–0.275</td>
+<td>ALLOW，1.0–1.25 GiB</td>
+</tr>
+<tr>
+<td>api-tidal</td>
+<td>平均 15%，峰值 90%，峰值 throttle</td>
+<td>DENY</td>
+<td>NOOP</td>
+</tr>
+<tr>
+<td>batch-nightly</td>
+<td>02:00 起 2 小时满载，近 deadline</td>
+<td>DENY</td>
+<td>DENY</td>
+</tr>
+<tr>
+<td>mem-near-oom</td>
+<td>cpu 空闲，内存近 limit，1 次 OOMKilled</td>
+<td>ALLOW</td>
+<td>DENY</td>
+</tr>
+<tr>
+<td>burning-slo</td>
+<td>用量低，burn rate 2.4，预算 0.125</td>
+<td>DENY</td>
+<td>DENY</td>
+</tr>
+<tr>
+<td>new-service</td>
+<td>只有 5 天数据</td>
+<td>UNKNOWN</td>
+<td>UNKNOWN</td>
+</tr>
+<tr>
+<td>no-slo</td>
+<td>用量低，没有 SLO</td>
+<td>REQUIRE_APPROVAL</td>
+<td>REQUIRE_APPROVAL</td>
+</tr>
+<tr>
+<td>hpa-managed</td>
+<td>cpu HPA，目标 70</td>
+<td>REQUIRE_APPROVAL</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>packing-trap</td>
+<td>cpu 可降，节点数不降</td>
+<td>ALLOW，realizable 0</td>
+<td>NOOP</td>
+</tr>
+</tbody>
+</table>
+<h2 id="装箱事实">装箱事实</h2>
+<p>自带 first-fit decreasing（四种排序键结果一致）：基线 6
+个节点；只应用 api-steady 的 cpu 推荐降到 5 个，约 140 美元每月；只应用
+packing-trap 的 cpu 推荐仍是 6 个，realizable 为 0。</p>
+<h2 id="契约变更请求">契约变更请求</h2>
+<ol type="1">
+<li>新增
+<code>container_cpu_usage_cores</code>（gauge）：子集不支持子查询。</li>
+<li>rate 窗口至少 <code>[10m]</code>：<code>[5m]</code> 在 5
+分钟网格上为空。</li>
+<li>NOOP 规则先于 OOM 守卫命中：mem-near-oom 的 memory
+无法在推荐值低于当前值时成为 DENY，建议调整判定顺序。</li>
+<li>batch 的「100%」按单线程满载（request 的 50%）解释；api-tidal
+的峰值用窄尖峰。</li>
+</ol>
+<h2 id="验收证据">验收证据</h2>
+<p>完整输出见
+<code>openspec/changes/c0028-k8s-world/evidence.md</code>：</p>
+<ul>
+<li><code>python3 -W ignore -m unittest discover -t . -s testenv -p 'test_*.py'</code>：58
+个测试，OK。</li>
+<li><code>python3 tools/check_rules.py --docs</code>：OK。</li>
+<li>真实起服务
+<code>--world k8s --port 19093</code>，series、query、嵌套子查询报错、burning-slo
+与 batch 的数值都已抽查。</li>
+</ul>
+</body>
+</html>
