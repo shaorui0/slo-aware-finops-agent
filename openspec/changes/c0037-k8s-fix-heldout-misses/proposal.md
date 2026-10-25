@@ -4,7 +4,7 @@ c0035 在预注册的新世界上暴露了 agent 一侧的三类缺陷（`eval/E
 
 ## What Changes
 
-1. **趋势守卫（条件 B 增加一个子项）。** 取窗口内每天的最大 working set（`max by (workload)(max_over_time(<metric>{...}[1d]))`，1d 步长的 range query），做最小二乘线性回归；按拟合线外推 `trend_horizon_days`（默认 14 天）得到预测峰值，若 `预测峰值 × (1+margin) > 推荐 request` 则 B FAIL（verdict DENY），理由用中文并写明斜率、R²、预测值。证据新增两条：斜率（GiB/天）与外推峰值。只有同时满足「斜率为正、R² ≥ `trend_min_r2`、窗口内拟合涨幅 ≥ `trend_min_rise`、点数 ≥ `trend_min_points`」才触发，避免昼夜与周周期的噪声造成误判。
+1. **趋势守卫（条件 B 增加一个子项）。** 取窗口内每天的最大 working set（`max by (workload)(max_over_time(<metric>{...}[1d]))`，1d 步长的 range query），做最小二乘线性回归；按拟合线外推 `trend_horizon_days`（默认 14 天）得到预测峰值，若 `预测峰值 × (1+margin) > 推荐 request` 则 B FAIL（verdict DENY），理由用中文并写明斜率、R²、预测值。触发时证据新增两条：斜率（GiB/天）与外推峰值；未触发的序列不加证据条目。只有同时满足「斜率为正、R² ≥ `trend_min_r2`、窗口内拟合涨幅 ≥ `trend_min_rise`、点数 ≥ `trend_min_points`」才触发，避免昼夜与周周期的噪声造成误判。
 2. **按容器过滤。** 用量（p50/p95/p99/max、逐小时序列）、throttling、requests、limits 的选择器加 `container="<name>"`，容器名取自本轮早先 `kube_deployment_spec_replicas` 的 `container` 标签。没有该标签时沿用旧选择器。
 3. **定价通道。** `--nodes-from <world.yaml>` 同时读取 `pricing` 块，按键覆盖 `config/k8s_policy.yaml` 的默认牌价；没有 `pricing` 时回落到默认，行为与现在相同。
 4. 阈值全部进 `config/k8s_policy.yaml`；契约的 B 增加趋势子项（见 specs 增量）。
