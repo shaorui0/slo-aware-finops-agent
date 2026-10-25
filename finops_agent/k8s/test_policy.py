@@ -44,6 +44,56 @@ def one(facts, cluster=None):
     return decide([facts], cluster or make_cluster(), POLICY)[0]
 
 
+def trend(slope, r2=0.99, fit_end=2.4, horizon=14.0, triggered=None):
+    proj = fit_end + slope * horizon
+    rise = slope * 13
+    return {"slope": slope, "r2": r2, "fit_start": fit_end - rise, "fit_end": fit_end, "rise": rise, "projected": proj, "points": 14,
+            "horizon_days": horizon, "triggered": slope > 0 if triggered is None else triggered}
+
+
+def with_trend(tr, resource="memory"):
+    f = make_facts(resource)
+    f["usage"]["trend"] = tr
+    f["evidence"] += [{"id": "E22", "query": "ols_slope_per_day(...)", "window": "14d@1d", "value": tr["slope"], "source": "prometheus"},
+                      {"id": "E23", "query": "ols_projection(...)", "window": "14d@1d+14d", "value": tr["projected"], "source": "prometheus"}]
+    f["ev"].update(trend_slope="E22", trend_proj="E23")
+    return f
+
+
+class TrendGuardTest(unittest.TestCase):
+    """condition B, trend sub-check: projected peak x (1+margin) must not exceed the proposed request"""
+
+    def test_rising_fails_b_and_denies(self):
+        d = one(with_trend(trend(0.076)))        # rec = 2.0 * 1.2 -> 2.4375; projected 2.4 + 1.064 = 3.46
+        b = d["conditions"]["B"]
+        self.assertEqual((b["status"], d["verdict"]), ("FAIL", "DENY"))
+        self.assertIn("持续爬升", b["why"])
+        self.assertIn("0.076", b["why"])
+        self.assertIn("E22", b["evidence"])
+        self.assertIn("E23", b["evidence"])
+
+    def test_flat_passes(self):
+        d = one(with_trend(trend(0.0, r2=0.1, triggered=False)))
+        self.assertEqual((d["conditions"]["B"]["status"], d["verdict"]), ("PASS", "ALLOW"))
+
+    def test_falling_is_not_a_failure(self):
+        d = one(with_trend(trend(-0.05, triggered=False)))
+        self.assertEqual(d["conditions"]["B"]["status"], "PASS")
+        self.assertNotIn("持续爬升", d["conditions"]["B"]["why"])
+
+    def test_rising_but_request_covers_the_projection(self):
+        d = one(with_trend(trend(0.005, fit_end=2.0)))     # projected 2.07 * 1.1 = 2.28 <= 2.4375
+        self.assertEqual(d["conditions"]["B"]["status"], "PASS")
+
+    def test_not_triggered_rise_is_ignored_even_if_projection_is_high(self):
+        d = one(with_trend(trend(0.2, r2=0.3, triggered=False)))
+        self.assertEqual(d["conditions"]["B"]["status"], "PASS")
+
+    def test_applies_when_the_recommendation_is_not_below_current_too(self):
+        d = one(with_trend(trend(0.5), "memory"), make_cluster())
+        self.assertEqual(d["verdict"], "DENY")
+
+
 class VerdictOrderTest(unittest.TestCase):
     def test_baseline_is_allow(self):
         d = one(make_facts())

@@ -16,6 +16,11 @@ max_throttle: 0.05           # 条件 B：高峰期 CFS throttling 比例上限�
 oom_guard: 0.9               # 条件 B：峰值 working set 低于 oom_guard * limit
 min_budget: 0.25             # 条件 C：剩余错误预算比例下限
 deadline_guard: 0.8          # 条件 C：批任务最长耗时不超过 deadline 的这个比例
+trend_resources: [memory]    # 条件 B 趋势子项适用的资源：内存不可压缩，泄漏的后果是 OOMKilled；cpu 可压缩，且 B 已有 throttling 守卫
+trend_horizon_days: 14       # 条件 B 趋势子项：按每日最大值的拟合线外推这么多天
+trend_min_points: 7          # 条件 B 趋势子项：至少这么多个有效天才拟合
+trend_min_r2: 0.6            # 条件 B 趋势子项：拟合优度下限，低于它视为没有趋势（昼夜、周周期噪声）
+trend_min_rise: 0.1          # 条件 B 趋势子项：窗口内拟合涨幅至少是拟合起点的这个比例
 same_target_tolerance: 0.05  # 台账：目标值相差不超过 5% 视为同一提案（c0030 起使用）
 
 hours_per_month: 730
