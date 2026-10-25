@@ -7,7 +7,7 @@ export FINOPS_LLM_MODE ?= replay
 PROM_URL ?= http://127.0.0.1:9090
 AWS_ENDPOINT ?=
 
-.PHONY: test check check-docs servers demo eval record stop alerts-test inspect rot-demo
+.PHONY: test check check-docs servers demo eval record stop alerts-test inspect rot-demo k8s-demo k8s-down
 
 # Docs checks (links, heading language) are on by default; DOCS_CHECK= (empty) turns them off
 DOCS_CHECK ?= 1
@@ -56,3 +56,9 @@ alerts-test:     ## validate and unit-test the FinOps alert rules
 
 inspect:         ## one inspection run with cross-run state (what cron calls); exports runs/<id>/finops_metrics.prom
 	$(PY) -m finops_agent run $(if $(AWS_ENDPOINT),--aws-endpoint $(AWS_ENDPOINT),) --prom $(PROM_URL) --run-id inspect-$$(date -u +%Y%m%dT%H%M%SZ)
+
+k8s-demo:        ## local k3d demo of the controlled-execution path (cluster finops-test only); log in runs/k8s-demo/demo.log
+	bash scripts/k8s_demo.sh
+
+k8s-down:        ## delete ONLY the finops-test k3d cluster
+	-k3d cluster delete finops-test
