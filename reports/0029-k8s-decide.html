@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0029-k8s-decide</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0029-k8s-decide</h1>
+</header>
+<h1 id="c0029-k8s-决策内核从-prometheus-到-verdict">c0029 K8s
+决策内核：从 Prometheus 到 verdict</h1>
+<h2 id="结论">结论</h2>
+<ul>
+<li>确定性决策内核已就位：PromQL
+取数、facts、推荐器、装箱节省、策略引擎（条件
+A–D、六步判定顺序）、<code>k8s_decisions.json</code> 写出。LLM 不参与
+verdict，narrative 恒为 null。</li>
+<li>DoD K2 的验证命令通过：<code>finops_agent/k8s</code> 下 51
+个单测全过；全仓 210
+个单测全过（含原有测试）；<code>check_rules --docs</code> 通过。</li>
+<li>有一处契约歧义需要维护者拍板：条件 D
+按字面实现时，节点数真正降下来的变更几乎都会因「缩容后没有回滚容量」被
+DENY。见「待决事项」。</li>
+</ul>
+<h2 id="做了什么">做了什么</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>模块</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config/k8s_policy.yaml</code></td>
+<td>全部阈值：min_days 14、min_coverage 0.9、cpu_headroom 0.3、cpu_step
+0.05、mem_headroom 0.2、mem_step 64Mi、margin 0.1、max_throttle
+0.05、oom_guard 0.9、min_budget 0.25、deadline_guard
+0.8、same_target_tolerance 0.05，以及窗口、有效天判据和默认牌价</td>
+</tr>
+<tr>
+<td><code>recommend.py</code></td>
+<td>cpu = p99 × 1.3 向上取整到 0.05；memory = 最大 working set × 1.2
+向上取整到 64Mi；不低于当前值为 NOOP</td>
+</tr>
+<tr>
+<td><code>packing.py</code></td>
+<td>first-fit decreasing，cpu 与 memory 都放得下才放；同分按 (namespace,
+pod) 打破；两种节省口径</td>
+</tr>
+<tr>
+<td><code>policy.py</code></td>
+<td>条件 A–D 各自输出
+<code>{status, why, evidence}</code>，六步判定顺序，HPA 联动，中文
+<code>unknown_needs</code>；<code>decide()</code> 与
+<code>write_decisions()</code></td>
+</tr>
+<tr>
+<td><code>collect.py</code></td>
+<td>只用契约指标名；每个数字一条 evidence；调用写入现有
+<code>Trace</code>；可注入传输层</td>
+</tr>
+</tbody>
+</table>
+<h2 id="判定顺序与测试覆盖">判定顺序与测试覆盖</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>规则</th>
+<th>测试</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 C FAIL → DENY</td>
+<td><code>test_2_c_fail_beats_a_unknown</code>、<code>test_c_fail_low_budget_and_batch_deadline</code></td>
+</tr>
+<tr>
+<td>2 A 不为 PASS → UNKNOWN</td>
+<td><code>test_3_a_unknown_gives_unknown_with_needs</code>、<code>test_3_a_unknown_beats_b_fail</code></td>
+</tr>
+<tr>
+<td>3 B 或 D FAIL → DENY</td>
+<td>throttling、Pending、OOMKilled、贴近 limit；推荐不低于当前时 B
+的风险判据仍在当前状态上生效（<code>test_3_noop_but_current_state_unsafe_is_deny</code>）</td>
+</tr>
+<tr>
+<td>4 推荐不低于当前 → NOOP</td>
+<td><code>test_1_noop_when_recommendation_not_lower</code></td>
+</tr>
+<tr>
+<td>5 UNKNOWN 或 HPA 联动 → REQUIRE_APPROVAL</td>
+<td><code>test_5_*</code>；UNKNOWN 永远不是 ALLOW</td>
+</tr>
+<tr>
+<td>6 其余 → ALLOW</td>
+<td><code>test_baseline_is_allow</code>、装箱陷阱</td>
+</tr>
+<tr>
+<td>同一 workload 上 memory B FAIL、cpu ALLOW</td>
+<td><code>test_4_memory_oom_denied_while_cpu_allowed_on_same_workload</code></td>
+</tr>
+<tr>
+<td>确定性</td>
+<td>同输入两次、反序输入，JSON 逐字节相同</td>
+</tr>
+</tbody>
+</table>
+<h2 id="两个口径的节省">两个口径的节省</h2>
+<p>装箱陷阱的 fixture：三个 3.5 core 的 pod 各占一个节点，剩 0.5
+core，api 的 pod 缩到 0.65 core 也挤不进去，节点数不变。结果是 verdict
+为 ALLOW、<code>request_value_usd_month</code> 大于
+0、<code>realizable_usd_month</code> 为 0。</p>
+<h2 id="待决事项">待决事项</h2>
+<ul>
+<li>条件 D 字面判据是「缩容后集群空闲 allocatable ≥ Δrequest ×
+副本数」。节点数降下来后，剩余节点的空闲通常小于刚释放的量，所以
+realizable 大于 0 的变更会被 D 判 FAIL。实现里加了可选输入
+<code>cluster.max_nodes</code>（自动扩缩上限）：给了就按上限算回滚容量，不给就保持字面。需要决定世界文件是否提供
+<code>nodes.max</code> 并由调用方传入，或把 D 改写为别的判据。</li>
+<li>契约之外新增三个名字：<code>container_cpu_usage_cores</code>（每 pod
+CPU 使用量 gauge，因为 PromQL
+子集不支持子查询）、<code>job_last_duration_seconds</code> 上的标签
+<code>deadline_seconds</code>、<code>kube_horizontalpodautoscaler_spec_target_metric</code>
+上的标签 <code>metric_name</code>；team 取自
+<code>kube_deployment_spec_replicas</code> 的 <code>team</code>
+标签。memory 的 evidence 值统一换算为 GiB。</li>
+</ul>
+<h2 id="验收证据">验收证据</h2>
+<p>原始输出见
+<code>openspec/changes/c0029-k8s-decide/evidence.md</code>。</p>
+<ul>
+<li><code>python3 -W ignore -m unittest discover -t . -s finops_agent -p 'test_*.py'</code>：Ran
+210 tests，OK</li>
+<li><code>python3 -W ignore -m unittest discover -t . -s finops_agent/k8s -p 'test_*.py'</code>：Ran
+51 tests，OK</li>
+<li><code>python3 tools/check_rules.py --docs</code>：OK</li>
+</ul>
+</body>
+</html>
