@@ -1,0 +1,238 @@
+# Second pre-registered K8s world (c0036), written and frozen BEFORE the fixes it will later measure.
+# Written blind: no eval result, agent code or policy config was read. Schema: c0027 spec + c0031 SLO catalog.
+# Units: cpu in cores, memory in GiB. request_range follows the contract rule (cpu = p99 per-pod x 1.3 ceil 0.05;
+# memory = max working set x 1.2 ceil 64Mi, range ~ +-10%; formula values were checked against the generated series). Where good SRE judgment disagrees with that rule,
+# the range follows the contract, `judgment_conflict: true` is set, and `why` states the disagreement.
+cluster:
+  name: finops-k8s-synth2
+  period: {start: "2026-09-28T00:00:00Z", end: "2026-10-26T00:00:00Z"}   # 28 days, starts on a Monday
+  step_seconds: 300
+
+# c6i.2xlarge (8 vCPU / 16 GiB): compute-optimised, memory is the scarcer axis here
+pricing: {node_type: c6i.2xlarge, node_hour_usd: 0.34, cpu_core_hour_usd: 0.0300, mem_gib_hour_usd: 0.0063}
+
+nodes: {count: 8, min: 5, max: 14, allocatable: {cpu: 7.6, memory_gib: 13.9}}
+
+workloads:
+  - name: checkout-web
+    namespace: shop
+    team: team-checkout
+    kind: Deployment
+    replicas: 4
+    container: {name: app, requests: {cpu: "2", memory: "3Gi"}, limits: {cpu: "4", memory: "4Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.4}
+    profile:
+      cpu: {kind: tidal, base: 0.2, amp: 0.5, peak_hour: 13, sigma_h: 2.0, jitter: 0.05}
+      mem: {kind: flat, base_gib: 1.1, jitter: 0.03}
+      http: {rps: 30, p99_base: 0.15}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.9, 1.1], why: "daily tide, peak ~0.7 core against a 2-core request and a 4-core limit, no throttling, SLO healthy"}
+      memory: {verdict: ALLOW, request_range: [1.3, 1.6], why: "flat ~1.1 GiB working set, 3 GiB reserved, far from the 4 GiB limit"}
+
+  - name: report-builder
+    namespace: analytics
+    team: team-bi
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "3.5", memory: "4Gi"}, limits: {cpu: "3.5", memory: "5Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.5}
+    profile:
+      cpu: {kind: weekly, base: 0.12, jitter: 0.03, peak_dow: 0, peak_hour: 7, peak_hours: 1, peak_value: 3.3}
+      mem: {kind: flat, base_gib: 1.6, jitter: 0.03}
+      throttle: {onset: 0.6, slope: 1.0, cap: 0.6}
+      http: {rps: 6, p99_base: 0.2, p99_per_throttle: 1.0}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [0.18, 0.22], judgment_conflict: true, why: "Monday 07:00 UTC weekly report run uses ~3.3 of 3.5 cores and throttles hard (request == limit); the peak is 4 x 12 samples, under 1% of the window, so p99 x1.3 (~0.2) is blind to it. Contract range is the formula value, SRE judgment is that the request must stay near 4.3 (B fails on peak throttling)"}
+      memory: {verdict: ALLOW, request_range: [1.9, 2.2], why: "flat ~1.6 GiB, including all 4 Mondays in the window"}
+
+  - name: search-indexer
+    namespace: search
+    team: team-search
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "2", memory: "4Gi"}, limits: {cpu: "4", memory: "6Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.4}
+    profile:
+      cpu: {kind: trend, start: 0.25, slope_per_day: 0.025, jitter: 0.05}
+      mem: {kind: flat, base_gib: 1.8, jitter: 0.03}
+      http: {rps: 12, p99_base: 0.15}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [1.2, 1.4], judgment_conflict: true, why: "usage grows ~0.025 core/day (0.25 -> ~1.0 over the window); p99 sits at the recent top so the contract gives ~1.3. SRE judgment: at that slope the new request is exhausted in about two weeks, a human should see the trend; contract verdict kept"}
+      memory: {verdict: ALLOW, request_range: [2.1, 2.45], why: "flat ~1.8 GiB, 4 GiB reserved"}
+
+  - name: session-cache
+    namespace: shop
+    team: team-checkout
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "0.5", memory: "8Gi"}, limits: {cpu: "1", memory: "8Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.2}
+    profile:
+      cpu: {kind: flat, base: 0.1, jitter: 0.08}
+      mem: {kind: creep, start_gib: 4.6, slope_gib_per_day: -0.14, jitter: 0.01}
+      http: {rps: 25, p99_base: 0.05}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.14, 0.2], why: "cpu ~0.1 core flat"}
+      memory: {verdict: ALLOW, request_range: [5.4, 6.2], judgment_conflict: true, why: "working set shrinks steadily from ~4.6 to ~0.7 GiB (key population draining). Contract uses the window max (the stale 4.6 GiB at the start) and gives ~5.6; SRE judgment is that the current need is ~1 GiB, but a trend alone does not prove a floor, so the contract value is safe, only conservative"}
+
+  - name: ingest-worker
+    namespace: data
+    team: team-data
+    kind: Deployment
+    replicas: 3
+    container: {name: worker, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    sidecar: {name: log-shipper, requests: {cpu: "0.25", memory: "0.5Gi"}, limits: {cpu: "0.5", memory: "1Gi"}, cpu_base: 0.3, cpu_jitter: 0.05, mem_gib: 0.75, mem_jitter: 0.02}
+    slo: {availability: 0.995, p99_seconds: 1.0}
+    profile:
+      cpu: {kind: flat, base: 0.12, jitter: 0.1}
+      mem: {kind: flat, base_gib: 0.9, jitter: 0.03}
+      http: {rps: 5, p99_base: 0.3}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.18, 0.22], why: "expect is for the main container `worker` only (~0.13 core). The pod also has a `log-shipper` sidecar using ~0.3 core against its own 0.25 request; the two containers must not be merged under the shared workload label"}
+      memory: {verdict: ALLOW, request_range: [1.05, 1.25], why: "main container ~0.9 GiB; the sidecar holds another ~0.75 GiB under the same workload label and must not be added in"}
+
+  - name: edge-collector
+    namespace: observability
+    team: team-platform
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1.5", memory: "3Gi"}, limits: {cpu: "3", memory: "4Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.5}
+    profile:
+      cpu: {kind: flat, base: 0.4, jitter: 0.08}
+      mem: {kind: flat, base_gib: 1.5, jitter: 0.03}
+      http: {rps: 20, p99_base: 0.15}
+      gaps: [{from: "2026-10-19T00:00:00Z", to: "2026-10-26T00:00:00Z"}]
+    data_days: 28
+    events:
+      - {type: load, at: "2026-10-21T00:00:00Z", factor: 1.9}
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.55, 0.66], why: "the last 7 days have no samples (scrape outage): 21 valid days but only 75% coverage and no view of the current state; a load step on 10-21 falls entirely inside the gap, so the visible p99 is stale"}
+      memory: {verdict: UNKNOWN, request_range: [1.75, 2.05], why: "same gap: the most recent week is missing, coverage 75%"}
+
+  - name: queue-consumer
+    namespace: shop
+    team: team-orders
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "1", memory: "3Gi"}, limits: {cpu: "2", memory: "4Gi"}}
+    hpa: {metric: memory, target_utilization: 75, min: 3, max: 8}
+    slo: {availability: 0.999, p99_seconds: 0.5}
+    profile:
+      cpu: {kind: flat, base: 0.2, jitter: 0.08}
+      mem: {kind: flat, base_gib: 1.4, jitter: 0.03}
+      http: {rps: 10, p99_base: 0.2}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.27, 0.35], why: "HPA scales on memory, so cpu is not coupled; cpu ~0.2 flat"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [1.6, 1.95], why: "request is the denominator of the memory-utilisation HPA target: lowering it moves the HPA operating point and scales out"}
+
+  - name: nightly-etl
+    namespace: data
+    team: team-data
+    kind: Deployment
+    replicas: 1
+    container: {name: job, requests: {cpu: "4", memory: "6Gi"}, limits: {cpu: "4", memory: "8Gi"}}
+    slo: {deadline_seconds: 7200}
+    profile:
+      cpu: {kind: batch, start_hour: 1, hours: 1, active: 1.8, idle: 0.02, jitter: 0.03}
+      mem: {kind: batch, idle_gib: 0.4, active_gib: 2.6, jitter: 0.02}
+      job: {base_seconds: 3300, jitter_seconds: 200, finish_hour: 2.0}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [2.3, 2.6], why: "idle 23h a day but saturates ~1.8 cores for 1h at 01:00 UTC; the p99 sees the batch window. Job finishes in ~3300s of a 7200s deadline, so the SLO guard passes"}
+      memory: {verdict: ALLOW, request_range: [3.05, 3.5], why: "peak working set ~2.7 GiB in the batch window, x1.2"}
+
+  - name: pricing-engine
+    namespace: shop
+    team: team-pricing
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "3Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.25, jitter: 0.08}
+      mem: {kind: leak, base_gib: 1.8, peak_gib: 2.85, cycle_hours: 30, jitter: 0.01}
+      http: {rps: 15, p99_base: 0.1}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.35, 0.45], why: "cpu ~0.25 flat"}
+      memory: {verdict: DENY, request_range: [3.4, 3.8], range_note: "max ws x1.2 is above the current request", why: "sawtooth working set peaks at ~95% of a limit equal to the request every 30h; no OOM yet but the guard on current state fails. Do not cut, consider raising"}
+
+  - name: admin-console
+    namespace: tools
+    team: team-internal
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    profile:
+      cpu: {kind: flat, base: 0.08, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.5, jitter: 0.03}
+      http: {rps: 2, p99_base: 0.15}
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.14, 0.17], why: "idle, but no SLO is defined anywhere: C is UNKNOWN, low usage cannot stand in for it"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [0.6, 0.7], why: "C is UNKNOWN (no SLO)"}
+
+  - name: notify-svc
+    namespace: shop
+    team: team-growth
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.15, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.03}
+      http: {rps: 12, p99_base: 0.1}
+    data_days: 28
+    events:
+      - {type: slo_burn, at: "2026-10-23T00:00:00Z", burn_rate: 0.7, budget_remaining: 0.10, ramp_hours: 24}
+    expect:
+      cpu: {verdict: DENY, request_range: [0.22, 0.28], why: "burn rate is below 1 (~0.7) but the error budget is down to ~10%: the budget guard fails (C), freeze changes until it recovers"}
+      memory: {verdict: DENY, request_range: [0.8, 0.95], why: "same C failure, budget ~10% remaining"}
+
+  - name: invoice-api
+    namespace: billing
+    team: team-billing
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.4}
+    profile:
+      cpu: {kind: flat, base: 0.2, jitter: 0.08}
+      mem: {kind: flat, base_gib: 1.0, jitter: 0.03}
+      http: {rps: 8, p99_base: 0.15}
+      slo_metrics: false
+    data_days: 28
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.27, 0.33], why: "the catalog defines an SLO but the recording rules (burn rate, remaining budget) are absent: nobody can say whether it is healthy, C is UNKNOWN"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [1.15, 1.4], why: "same: SLO target known, SLO state unobservable (C UNKNOWN)"}
+
+traps:
+  - {workload: report-builder, why: "average usage ~4% of request, but a 1h weekly peak at ~94% of a limit that equals the request, invisible to p99"}
+  - {workload: search-indexer, why: "p99 gives a safe-looking number today, but usage grows steadily and will exhaust it within two weeks"}
+  - {workload: session-cache, why: "window max is the stale start of a long decline; the formula over-reserves relative to current need"}
+  - {workload: ingest-worker, why: "two containers share one workload label; the sidecar's usage must not be merged into the main container"}
+  - {workload: edge-collector, why: "21 valid days pass a day-count check, but the whole last week is missing and a load step is hidden inside the gap"}
+  - {workload: queue-consumer, why: "HPA scales on memory: memory request is its denominator while cpu is free to change"}
+  - {workload: nightly-etl, why: "idle 23h a day looks wasteful, but the batch window saturates; here the deadline has slack, so the p99-based cut is correct"}
+  - {workload: pricing-engine, why: "no OOM has happened, but the working set peaks at ~95% of the limit"}
+  - {workload: admin-console, why: "idle is not permission: no SLO anywhere"}
+  - {workload: notify-svc, why: "burn rate is under 1, only the remaining error budget (~10%) says the service is fragile"}
+  - {workload: invoice-api, why: "SLO target exists in the catalog but its burn metrics do not: unobservable health is UNKNOWN, not healthy"}

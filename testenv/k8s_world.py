@@ -32,6 +32,9 @@ Additive extensions (c0035, used by the pre-registered fresh world; none of them
   profile.gaps [{from, to}]                                                         samples inside become None (data gap mid-window)
   profile.slo_metrics: false                                                        no slo_* series even though the workload has an SLO
   workload.sidecar {name, requests, limits, cpu_base, cpu_jitter, mem_gib, mem_jitter}   a second container per pod under the same workload label
+
+Additive extension (c0036, used by the second pre-registered world; changes no existing series):
+  cpu trend   {start, slope_per_day, jitter}     linear drift of cpu usage over the period, either direction (slow growth or decay)
 """
 from __future__ import annotations
 
@@ -222,6 +225,8 @@ def cpu_cores(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float
             u = (p["peak_value"] if on else p["base"]) * (1 + j)
         elif p["kind"] == "spiky":
             u = (p["spike_value"] if spike_rng.random() < p["spike_prob"] else p["base"]) * (1 + j)
+        elif p["kind"] == "trend":
+            u = (p["start"] + p["slope_per_day"] * (t - world.t0) / 86400) * (1 + j)
         else:
             raise ValueError(p["kind"])
         out.append(max(0.0, u * spread * _load_factor(w, t)))
