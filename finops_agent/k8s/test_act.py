@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from finops_agent.k8s import act
+from finops_agent.k8s import act, ledger
 
 CTX = "k3d-finops-test"
 BEFORE = {"requests": {"cpu": "500m", "memory": "128Mi"}, "limits": {"cpu": "1", "memory": "256Mi"}, "replicas": 1}
@@ -73,7 +73,7 @@ class FakeKube:
         return [c for c in self.cmds if " patch " in c]
 
 
-class ActTest(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
@@ -97,6 +97,9 @@ class ActTest(unittest.TestCase):
     def last_record(self):
         return json.loads(self.actions.read_text().splitlines()[-1])
 
+
+
+class ActTest(Base):
     # ---- refusal paths: no write may reach the cluster
     def test_wrong_context_refused(self):
         self.approve()
@@ -242,6 +245,100 @@ class ActTest(unittest.TestCase):
             act.main(["status", "--plans", str(plans)])
         self.assertIn("verified", buf.getvalue())
         self.assertEqual(act.main(["apply", "--plans", str(plans), "--plan-id", "nope"]), 2)
+
+
+class LedgerTest(Base):
+    """The executor moves the proposal ledger after each outcome (runs on top of ActTest's fake kubectl)."""
+
+    def setUp(self):
+        super().setUp()
+        (self.root / "runs/r1").mkdir(parents=True, exist_ok=True)
+        self.state = self.root / "runs/k8s_state.json"
+        ledger.save_state(self.state, {**ledger.empty_state(), "last_run": {"run_id": "r1", "as_of": "2026-10-25T00:00:00Z"},
+                                       "proposals": [{"plan_id": self.plan["plan_id"], "key": "shop/api-steady/cpu",
+                                                      "decision_id": "K-shop-api-steady-cpu", "namespace": "shop",
+                                                      "workload": "api-steady", "resource": "cpu", "verdict": "ALLOW",
+                                                      "target": {"request": 0.1, "unit": "core"}, "status": "proposed",
+                                                      "history": [{"run_id": "r1", "as_of": "x", "status": "proposed", "note": ""}]}]})
+
+    def run_apply(self, kube, plan=None):
+        with mock.patch.object(act.subprocess, "run", kube):
+            return act.apply_plan(plan or self.plan, self.actions, root=self.root, poll_seconds=0, state_path=self.state)
+
+    def hist(self):
+        return [h["status"] for h in ledger.load_state(self.state)["proposals"][0]["history"]]
+
+    def test_verified_moves_ledger_through_approved_applied_verified(self):
+        self.approve()
+        rec = self.run_apply(FakeKube())
+        self.assertEqual(rec["outcome"], "verified")
+        self.assertEqual(self.hist(), ["proposed", "approved", "applied", "verified"])
+        self.assertEqual(rec["ledger"]["status"], "verified")
+        first = json.loads(self.actions.read_text().splitlines()[0])
+        self.assertEqual((first["outcome"], first["ledger"]["status"]), ("applied", "applied"))
+
+    def test_rollback_moves_ledger_to_rolled_back(self):
+        self.approve()
+        self.plan["observe_seconds"] = 10
+        rec = self.run_apply(FakeKube(metrics="cpu_throttle_ratio 0.8\n"))
+        self.assertEqual(rec["outcome"], "rolled_back")
+        self.assertEqual(self.hist(), ["proposed", "approved", "applied", "rolled_back"])
+
+    def test_refused_leaves_ledger_alone(self):
+        rec = self.run_apply(FakeKube())   # no approval file
+        self.assertEqual(rec["outcome"], "refused")
+        self.assertEqual(self.hist(), ["proposed"])
+        self.assertNotIn("ledger", rec)
+
+    def test_failed_after_apply_stays_applied(self):
+        self.approve()
+        self.plan["observe_seconds"] = 10
+        kube = FakeKube(metrics="cpu_throttle_ratio 0.9\n")
+        orig = kube.__call__
+
+        def stuck(argv, **kw):
+            if argv[2].count(" patch ") and '"500m"' in argv[2]:
+                kube.cmds.append(argv[2])
+                return subprocess.CompletedProcess(argv, 0, "", "")
+            return orig(argv, **kw)
+
+        rec = self.run_apply(stuck)
+        self.assertEqual(rec["outcome"], "failed")
+        self.assertEqual(self.hist(), ["proposed", "approved", "applied"])
+
+    def test_missing_proposal_does_not_change_outcome(self):
+        self.approve()
+        ledger.save_state(self.state, ledger.empty_state())
+        rec = self.run_apply(FakeKube())
+        self.assertEqual(rec["outcome"], "verified")
+        self.assertIsNone(rec["ledger"]["status"])
+        self.assertIn("no live proposal", rec["ledger"]["error"])
+
+    def test_no_state_given_is_reported_not_fatal(self):
+        self.approve()
+        with mock.patch.object(act.subprocess, "run", FakeKube()):
+            rec = act.apply_plan(self.plan, self.actions, root=self.root, poll_seconds=0)
+        self.assertEqual(rec["outcome"], "verified")
+        self.assertIn("not updated", rec["ledger"]["error"])
+
+    def test_cli_default_state_is_under_root(self):
+        self.approve()
+        plans = self.root / "runs/r1/k8s_plans.json"
+        plans.write_text(json.dumps({"plans": [self.plan]}))
+        with mock.patch.object(act.subprocess, "run", FakeKube()):
+            rc = act.main(["apply", "--plans", str(plans), "--plan-id", self.plan["plan_id"], "--root", str(self.root), "--poll-seconds", "0"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.hist()[-1], "verified")
+
+    def test_drift_only_on_touched_resources(self):
+        live = copy.deepcopy(BEFORE)
+        live["requests"]["memory"] = "999Mi"        # not part of this plan
+        self.assertTrue(act.same_resources(live, {"requests": {"cpu": "500m"}, "limits": {"cpu": "1"}, "replicas": 1}, {"cpu"}))
+        live["requests"]["cpu"] = "250m"
+        self.assertFalse(act.same_resources(live, {"requests": {"cpu": "500m"}, "limits": {"cpu": "1"}, "replicas": 1}, {"cpu"}))
+        live2 = copy.deepcopy(BEFORE)
+        live2["replicas"] = 2
+        self.assertFalse(act.same_resources(live2, BEFORE, {"cpu"}))
 
 
 if __name__ == "__main__":

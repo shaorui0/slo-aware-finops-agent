@@ -7,12 +7,17 @@ Gates, in order (any failure stops, and is recorded as `refused`):
 Then: INTENT-prefixed patch -> rollout status -> observe -> stop condition ->
 rollback_cmd -> rollout status -> verify resources == before.
 
+Ledger (runs/k8s_state.json, see ledger.py): after the patch is applied the proposal moves proposed -> approved -> applied;
+then verified, or rolled_back. `refused` never changes it; `failed` after the patch stays `applied` for a human.
+A ledger write that cannot be done (no live proposal, bad transition) is reported in the record's `ledger` field
+and on the terminal; it never changes the execution outcome.
+
 Every kubectl call goes through `kubectl()`, which ALWAYS passes `--context`
 taken from the plan. Write commands are executed as a string whose first line
 is a `# INTENT:` comment (what the project hook also requires).
 
 Usage:
-  python3 -m finops_agent.k8s.act apply  --plans runs/<id>/k8s_plans.json --plan-id P-...
+  python3 -m finops_agent.k8s.act apply  --plans runs/<id>/k8s_plans.json --plan-id P-... [--state runs/k8s_state.json]
   python3 -m finops_agent.k8s.act status --plans runs/<id>/k8s_plans.json
 """
 from __future__ import annotations
@@ -27,6 +32,8 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from finops_agent.k8s import ledger
 
 TEST_CONTEXT = "k3d-finops-test"
 ALLOWED_WRITE_VERBS = {"patch", "scale", "set", "rollout"}
@@ -148,9 +155,20 @@ def read_live(plan):
             "replicas": dep["spec"].get("replicas", 1)}, dep
 
 
-def same_resources(a, b):
-    return (norm_res(a.get("requests")) == norm_res(b.get("requests"))
-            and norm_res(a.get("limits")) == norm_res(b.get("limits"))
+def touched(plan):
+    """Resource names the plan is about: keys of before.requests / before.limits and of the patch."""
+    req, lim = patched_target(plan)
+    b = plan.get("before") or {}
+    return set(b.get("requests") or {}) | set(b.get("limits") or {}) | set(req) | set(lim)
+
+
+def same_resources(a, b, only=None):
+    """a == b on requests, limits and replicas. `only`: compare just these resource names (a generated plan changes one
+    resource, so the other one differing is not drift)."""
+    def pick(d):
+        return {k: v for k, v in (d or {}).items() if only is None or k in only}
+    return (norm_res(pick(a.get("requests"))) == norm_res(pick(b.get("requests")))
+            and norm_res(pick(a.get("limits"))) == norm_res(pick(b.get("limits")))
             and a.get("replicas") == b.get("replicas"))
 
 
@@ -270,13 +288,37 @@ def load_plans(path):
     return doc["plans"] if isinstance(doc, dict) else doc
 
 
-def apply_plan(plan, actions_path, root=Path("."), port=8080, poll_seconds=5):
-    """Run one plan through every gate. Returns the final outcome record."""
+def ledger_mark(state_path, plan, status, note=""):
+    """Move the plan's proposal to `status` in the ledger. Returns what to put in the record's `ledger` field; never raises."""
+    if state_path is None:
+        return {"status": None, "error": "no --state given, ledger not updated"}
+    try:
+        st = ledger.load_state(state_path)
+        ref = plan.get("plan_id")
+        live = next((p for p in reversed(st["proposals"]) if ref in (p["plan_id"], p["key"], p["decision_id"]) and p["status"] in ledger.LIVE), None)
+        if live is not None and live["status"] == "proposed" and status == "applied":
+            st = ledger.mark(st, ref, "approved", run_id="act", note="approval 文件存在，执行器开始改")
+        st = ledger.mark(st, ref, status, run_id="act", note=note[:200])
+        ledger.save_state(state_path, st)
+        log(f"ledger {ref} -> {status}")
+        return {"status": status, "state": str(state_path)}
+    except (ValueError, OSError, KeyError) as e:
+        log(f"LEDGER NOT UPDATED for {plan.get('plan_id')} -> {status}: {e}")
+        return {"status": None, "wanted": status, "error": str(e)}
+
+
+def apply_plan(plan, actions_path, root=Path("."), port=8080, poll_seconds=5, state_path=None):
+    """Run one plan through every gate. Returns the final outcome record. state_path: the proposal ledger to move."""
     pid = plan.get("plan_id", "?")
     rec = {"plan_id": pid, "decision_id": plan.get("decision_id"), "context": plan.get("context"),
            "started_at": now()}
 
     def finish(outcome, reason, **extra):
+        mark = {"verified": "verified", "rolled_back": "rolled_back"}.get(outcome)
+        if mark:
+            rec["ledger"] = ledger_mark(state_path, plan, mark, reason)
+        elif outcome == "failed" and "applied_at" in rec:
+            rec["ledger"] = {"status": "applied", "note": "补丁已应用但没有恢复到可确认的状态，台账停在 applied，需要人处理"}
         rec.update(outcome=outcome, reason=reason, finished_at=now(), **extra)
         append_record(actions_path, rec)
         return rec
@@ -299,7 +341,7 @@ def apply_plan(plan, actions_path, root=Path("."), port=8080, poll_seconds=5):
         ns, w = target_of(plan)
         # 3. drift
         live, dep = read_live(plan)
-        if not same_resources(live, plan["before"]):
+        if not same_resources(live, plan["before"], touched(plan)):
             return finish("refused", "state drift: live resources differ from plan.before",
                           live=live, expected=plan["before"])
         # 4. patch with INTENT
@@ -311,7 +353,8 @@ def apply_plan(plan, actions_path, root=Path("."), port=8080, poll_seconds=5):
         if r.returncode != 0:
             return finish("failed", f"apply_cmd failed: {r.stderr.strip()[:200]}")
         rec["applied_at"] = now()
-        append_record(actions_path, {**rec, "outcome": "applied", "reason": "patch applied, observing"})
+        led = ledger_mark(state_path, plan, "applied", f"{pid} 补丁已应用，观察 {plan.get('observe_seconds')}s")
+        append_record(actions_path, {**rec, "outcome": "applied", "reason": "patch applied, observing", "ledger": led})
         # 5. rollout
         ok, tail = rollout_ok(plan)
         stop = None if ok else {"signal": "rollout_failed", "op": "==", "value": 0, "observed": tail[0]}
@@ -329,7 +372,7 @@ def apply_plan(plan, actions_path, root=Path("."), port=8080, poll_seconds=5):
             rec["rollback_executed"] = f"# INTENT: {rintent}\n{shlex.join(['kubectl', '--context', plan['context'], *rollback_args])}"
             ok2, _ = rollout_ok(plan)
             live2, _ = read_live(plan)
-            restored = rr.returncode == 0 and ok2 and same_resources(live2, plan["before"])
+            restored = rr.returncode == 0 and ok2 and same_resources(live2, plan["before"], touched(plan))
             if restored:
                 return finish("rolled_back", f"stop condition {stop['signal']} {stop['op']} {stop['value']} "
                                              f"(observed {stop['observed']}); resources verified equal to before",
@@ -354,7 +397,8 @@ def cmd_apply(a):
         print(f"unknown plan id {a.plan_id}; have: {sorted(plans)}", file=sys.stderr)
         return 2
     rec = apply_plan(plans[a.plan_id], Path(a.plans).parent / "k8s_actions.jsonl", root=Path(a.root),
-                     port=a.metrics_port, poll_seconds=a.poll_seconds)
+                     port=a.metrics_port, poll_seconds=a.poll_seconds,
+                     state_path=Path(a.root) / a.state if not Path(a.state).is_absolute() else Path(a.state))
     return EXIT.get(rec["outcome"], 5)
 
 
@@ -381,6 +425,7 @@ def main(argv=None):
     q.add_argument("--plans", required=True)
     q.add_argument("--plan-id", required=True)
     q.add_argument("--root", default=".", help="base directory for the plan's relative approval_file")
+    q.add_argument("--state", default="runs/k8s_state.json", help="proposal ledger to move (relative to --root)")
     q.add_argument("--metrics-port", type=int, default=8080)
     q.add_argument("--poll-seconds", type=float, default=5)
     q.set_defaults(fn=cmd_apply)
