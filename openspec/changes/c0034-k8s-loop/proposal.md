@@ -9,7 +9,7 @@ c0030（执行）、c0031（流水线、台账、计划）、c0032（报告）�
 - `k8s run` 在 `runs/<id>/` 额外写 `k8s_daily.html`、`k8s_weekly.html`、`k8s_monthly.html`。可选 `--prev-run`（上一次 run 目录，日报对比用）、`--score`（考卷 JSON）；`k8s_actions.jsonl`、`k8s_verify.json` 在 run 目录里有就读。
 - `report.py` 对齐真实形状：台账是 `proposals[].status` 与 `history[].status`；考卷是 `eval/score_k8s.py` 的 `k8s_eval.json`；计划是 `{run_id, as_of, safe_halt, plans[]}`；`narrative` 是对象，在「结论」里渲染，标明「由模型撰写、数字已核对」，`would_change` 渲染为「什么情况下判定会变」。
 - 报告打磨：证据表每行带人话标签（E8 是「有效天数」，E9 是「覆盖率」）；不显示与该 workload 无关或为空的证据（非批任务的 job 时长、空值）；每张卡片的「做完应该是什么样」第一句直接说钱动不动、为什么。
-- `collect.py` 给证据条目加 `label`（只加字段，不改任何数值，`make k8s-eval` 数字不变）。
+- 证据标签放在 `report.py` 里按查询语句与窗口推导，不改 `collect.py`：证据条目会原样进入叙述的提示词，cassette 以提示词内容为键，给证据加字段会让 18 条 cassette 全部失效（`make k8s-eval` 会因缺 cassette 失败）。
 - `k8s-demo` 改用流水线生成的计划：先对合成世界跑 `k8s run`，从 `k8s_plans.json` 取 shop/api-steady 的 ALLOW 计划（cpu 走回滚路径，memory 走 verified 路径），demo 清单的 request/limit/副本数/容器名与世界里的 api-steady 一致，因此不需要改写 `before`；不一致时才改写并大声打印。演示结束渲染含真实 `k8s_actions.jsonl` 的周报，并打印台账流转。
 - `reports/k8s-sample/*.html` 改为真实运行产物：k8s-days 的 day1/day2、真实台账、`k8s-eval` 的考卷、demo 的真实执行记录（拷进夹具以便复现）。t6 的 `k8s_verify.json` 不在本分支，沿用夹具里的核实文件并注明。
 
@@ -36,8 +36,8 @@ c0030 的 demo 里，回滚是被 CPU limit 压到 200m 引起的 throttle 触�
 ### Modified Capabilities
 - `k8s-act`（c0030）：多了台账回写与按涉及资源比较的漂移闸门。
 - `k8s-pipeline`（c0031）：多了三份 HTML 输出和 `--prev-run` / `--score`。
-- `k8s-report`（c0032）：输入形状对齐真实文件；narrative 对象渲染；证据标签。
+- `k8s-report`（c0032）：输入形状对齐真实文件；narrative 对象渲染；证据标签与相关性过滤。
 
 ## Impact
 
-`finops_agent/k8s/{act,report,pipeline,collect,ledger}.py` 与测试、`finops_agent/__main__.py`（k8s 子命令）、`finops_agent/k8s/fixtures/`、`scripts/k8s_demo.sh`、`scripts/k8s_report_samples.sh`、`ops/k3d/`、`reports/k8s-sample/`。不改 README、`reports/index.html`、Makefile。
+`finops_agent/k8s/{act,report,pipeline}.py` 与测试（`collect.py`、`ledger.py` 不改）、`finops_agent/__main__.py`（k8s 子命令）、`finops_agent/k8s/fixtures/`、`scripts/k8s_demo.sh`、`scripts/k8s_report_samples.sh`、`ops/k3d/`、`reports/k8s-sample/`。不改 README、`reports/index.html`、Makefile。
