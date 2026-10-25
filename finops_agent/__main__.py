@@ -20,6 +20,7 @@ from finops_agent.analyze import Analyzer, assign_owners, check_invariants
 from finops_agent.collect import Collector, Config, Trace, save
 from finops_agent import fivepart, report, slo, visibility
 from finops_agent.judge import gather, judge_leads
+from finops_agent.k8s import pipeline as k8s_pipeline
 from finops_agent.llm import LLMClient
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -97,9 +98,12 @@ def main(argv=None):
     r.add_argument("--no-state", action="store_true", help="do not update the cross-run state")
     r.add_argument("--no-judge", action="store_true",
                    help="skip the judgment layer (deterministic detectors only); FINOPS_NO_JUDGE=1 does the same, for scripts/rot_demo.sh")
+    k8s_pipeline.add_parser(sub)
     args = ap.parse_args(argv)
     if args.cmd == "run":
         run(args)
+    elif args.cmd == "k8s":
+        k8s_pipeline.dispatch(args)
 
 
 if __name__ == "__main__":
