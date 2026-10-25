@@ -277,6 +277,9 @@ flowchart TB
 | c0034-k8s-loop | 10-26 | 执行回写台账、`k8s run` 出日/周/月三份报告、demo 改用流水线生成的计划；报告读真实台账与考卷，证据带人话标签 | 降 request 不会 throttle，demo 的回滚靠 p99 加注入过载，只证明守卫会触发，不证明因果 | [报告](reports/0034-k8s-loop.html) · [笔记](notes/blog/0034-k8s-loop.md) |
 | c0035-k8s-fresh-heldout | 10-26 | 预注册新 K8s 世界（10 个 workload、8 种新情形），冻结后评估一次；verdict_accuracy 1.0→0.90，unsafe_allow 1（内存泄漏趋势被判 ALLOW） | 样本内 1.0 是拟合；最危险的失败是契约没写的信息（趋势、sidecar、尖峰尾部） | [报告](reports/0035-k8s-fresh-heldout.html) · [笔记](notes/blog/0035-k8s-fresh-heldout.md) |
 | c0036-k8s-fresh2-freeze | 10-26 | 第二个预注册 K8s 世界（12 个 workload、c6i.2xlarge 定价）盲写并冻结，冻结 sha 10eefdb；未运行任何评估 | 用来找 bug 的世界不能度量修复，要在修复前盲写第二个；契约与 SRE 判断冲突处标 judgment_conflict 而不改答案 | [报告](reports/0036-k8s-fresh2-freeze.html) · [笔记](notes/blog/0036-k8s-fresh2-freeze.md) |
+| c0037-k8s-fix-heldout-misses | 10-26 | 修 c0035 暴露的 agent 侧缺陷：B 增加趋势子项（每日峰值最小二乘外推，仅内存）、用量按容器过滤、`--nodes-from` 读世界定价；第一个预注册世界 verdict 0.90→1.0、unsafe_allow 1→0（已污染）；route-quote 留给维护者 | 失败驱动的修复不能用同一个世界证明泛化；趋势守卫的阈值是读着失败设的 | [报告](reports/0037-k8s-fix-heldout-misses.html) · [笔记](notes/blog/0037-k8s-fix-heldout-misses.md) |
+| c0038-k8s-fresh2-eval | 10-26 | 第二个预注册 K8s 世界（修复前冻结）评估一次：verdict_accuracy 0.9167、unsafe_allow 0、unknown_recall 0（最后一周无数据的 workload 被静默丢弃） | 修复的考卷要在修复前写好；危险失败清零，新失败是「沉默」 | [报告](reports/0038-k8s-fresh2-eval.html) · [笔记](notes/blog/0038-k8s-fresh2-eval.md) |
+| c0039-mainline-narrative | 10-26 | README / NARRATIVE / MATURITY / BUILD_PROCESS 以主线为主体：判定流程图、日报说明、核实表、四世界成绩单、主线架构图；广度扫描移入附录 | 成绩单的列顺序就是论证顺序；危险失败单列一行 | [报告](reports/0039-mainline-narrative.html) · [笔记](notes/blog/0039-mainline-narrative.md) |
 
 ### 2.5 目录
 
