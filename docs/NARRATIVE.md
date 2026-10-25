@@ -1,10 +1,100 @@
 # 我是 Agent Engineer：这个项目证明了什么
 
-这一页给面试官和评审。每条能力声明只有三样东西：一句话的主张、能点开核对的证据、诚实的边界。证据都在仓库里，命令可复现；边界写在主张旁边，不放到附录里。
+这一页给面试官和评审。每条能力声明只有三样东西：一句话的主张、能点开核对的证据、诚实的边界。证据都在仓库里，命令可复现；边界写在主张旁边。
 
-先说定位。项目叫 SLO-aware FinOps Agent，主线只做一件事：在 SLO 和容量约束下优化 K8s workload 的 CPU/Memory requests，人批准后在测试集群执行并核实节省（见 [`MATURITY.md`](MATURITY.md) 的主线一节）。下面十二项能力的证据大多来自更早的广度扫描（12 类 AWS 浪费），那部分现已冻结为附录。我做的是 agent 的工程：决定它能碰什么、被告知什么、输出怎么检查、怎样变好而不倒退。FinOps 是载体，因为成本问题每家公司都有，数据是结构化的，答错有实际代价。完整的需求和取舍见 [`REQUIREMENTS.md`](REQUIREMENTS.md)，模块与数据流见 [`ARCHITECTURE.md`](ARCHITECTURE.md)，各项能力的完成度见 [`MATURITY.md`](MATURITY.md)，构建过程见 [`BUILD_PROCESS.md`](BUILD_PROCESS.md)。
+先说定位。项目叫 SLO-aware FinOps Agent。它只做一件事：在服务 SLO、容量安全和变更策略的约束下，优化 K8s workload 的 CPU/Memory requests；人批准之后在测试集群上执行，执行之后核实是否真的省了钱。我做的是 agent 的工程：决定它能碰什么、被告知什么、输出怎么检查、怎样变好而不倒退。完整的需求和取舍见 [`REQUIREMENTS.md`](REQUIREMENTS.md) R20，完成度见 [`MATURITY.md`](MATURITY.md)，构建过程见 [`BUILD_PROCESS.md`](BUILD_PROCESS.md)。
 
-## 十二项能力声明
+## 主线：八项能力声明
+
+主线是 K8s workload 的 CPU/Memory requests。每条声明的格式和后面附录部分相同：主张、证据、边界。
+
+### M1. 先收窄问题，再写契约
+
+- 主张：项目从「找 12 类 AWS 浪费」收窄到「一类资源做到能动手、能核实」，并且在写任何代码之前先写接口契约（输入、指标名、四个条件、判定顺序、产物格式），让后续几个 agent 能按契约并行开发。契约被实现反过来修正过三次，每次都有记录。
+- 证据：契约 [`c0027 spec`](../openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md)、需求 [`REQUIREMENTS.md`](REQUIREMENTS.md) R20。三次修正分别是：
+  - 判定顺序里 NOOP 原本排第一，会让快 OOM 的内存永远判成「无需调整」，改为排在风险守卫之后（c0028 发现）。
+  - deadline 属于 SLO 定义而不是指标，SLO 目录成为第三个独立输入，判对率从 16/18 到 18/18（c0031）。
+  - 条件 D 按字面实现，会否决几乎所有真正能省掉节点的变更，改为允许依赖节点扩容回滚（c0029 发现、c0031 定稿）。
+- 边界：契约是我按需求文档写的，没有和真实团队的变更流程对过。
+
+### M2. 判定是确定性的，LLM 只写解释
+
+- 主张：推荐值、装箱、四个条件、判定顺序全部是代码。LLM 每条决策调用一次，只拿这一条的证据，写解释、提案和「什么情况下判定会变」。写完之后断言判定没被改；数字必须能在证据里找到，找不到的句子被抹掉并留痕。
+- 证据：
+  - 代码：[`policy.py`](../finops_agent/k8s/policy.py)、[`narrate.py`](../finops_agent/k8s/narrate.py)。
+  - 验收证据：c0031 [`evidence.md`](../openspec/changes/c0031-k8s-pipeline/evidence.md)。18 条解释全部来自真实 `claude -p` 的录制回放，未落地数字 0，打分器把「解释里有未落地数字」也算作闸门失败。
+- 边界：录制的回答没有触发过抹除，抹除路径只被单元测试覆盖。解释写得好不好，没有人读过之外的评估（K12）。
+
+### M3. 受控执行：批准、闸门、回滚
+
+- 主张：agent 能动手，但只在人创建批准文件之后、只在本地 k3d 测试集群上执行。执行前有三道闸：批准文件、context、现场状态与计划一致。执行后进入 canary 观察，命中停止条件就自动回滚，并验证资源回到变更前。项目 hook 拦掉其他任何 context 上的 kubectl 写操作。
+- 证据：
+  - 代码：[`act.py`](../finops_agent/k8s/act.py)、[`hooks/aws_readonly_guard.py`](../hooks/aws_readonly_guard.py)。
+  - 演示日志：c0030 [`evidence.md`](../openspec/changes/c0030-k3d-act/evidence.md)、c0034 [`evidence.md`](../openspec/changes/c0034-k8s-loop/evidence.md)，用的是流水线生成的计划。
+  - 两次拒绝之后集群和台账都没变。内存计划在注入过载下 p99 0.7506 > 0.3，触发回滚。CPU 计划观察 120 秒后核实通过。台账走完了 applied → verified 和 applied → rolled_back 两条路。
+- 边界：
+  - 回滚证明的是「退化时守卫会触发」，不是「降 request 造成了退化」。throttling 来自 limit 而不是 request，演示里的过载是人为注入的。
+  - 只在 k3d 上跑过，没有在真实集群上执行。
+
+### M4. 持续运行：每天跑一次也不会出乱子
+
+- 主张：提案台账让重复运行不重复提案；判定变化或目标值偏离超过 5% 时旧提案过期、重新提案；已执行的 workload 出现 SLO 退化时全局 safe_halt，之后只报告不出计划，直到人工清除。
+- 证据：
+  - `make k8s-days`，见 c0031 [`evidence.md`](../openspec/changes/c0031-k8s-pipeline/evidence.md)。第 2 天 burning-slo 开始烧预算，两条提案过期；第 3 天负载漂移 +60%，api-steady 的目标从 0.25 变成 0.35，旧提案过期并重新提案。
+  - safe_halt 由单元测试覆盖：[`test_ledger.py`](../finops_agent/k8s/test_ledger.py)。
+- 边界：三天是模拟时钟，没有在真实环境里用 cron 跑过；safe_halt 只在单元测试里触发过。
+
+### M5. 省没省：核实而不是预测
+
+- 主张：降 request 只有在节点数变少时才省钱。每条推荐同时报两种口径（账面释放的预留、节点能缩才兑现的钱），不相加；执行之后用前后两段节点小时账单核实，把变化精确拆成五类原因。
+- 证据：[`K8S_SAVINGS_VERIFICATION.md`](K8S_SAVINGS_VERIFICATION.md)（由 `make k8s-verify` 生成）、c0033 [`evidence.md`](../openspec/changes/c0033-k8s-verify/evidence.md)。合计预测 $280.32，实际 $140.16。packing-trap 账面释放 $36.91，实际 0；被回滚的那条实现率 0%。分解误差 4e-14。
+- 边界：场景参数是挑过的，为了让每类偏差各出现一次；合成指标不随 request 变化，所以没有延迟和 throttling 模型。
+
+### M6. 评估纪律：样本内的 1.0 不算数
+
+- 主张：对照标准答案打分，unsafe ALLOW（该拒却放行）是硬闸。样本内的满分只是上界。泛化只看预注册世界：先盲写并冻结，再只评一次。用来找 bug 的世界不能度量修复，所以修复之前先盲写第二个世界并冻结。
+- 证据：[`eval/EXPERIMENTS.md`](../eval/EXPERIMENTS.md) §8 起；冻结提交早于评估提交，可在 `git log` 里核对。
+- 边界：见下面的成绩单。
+
+### M7. 给不懂项目的人看的报告
+
+- 主张：同一份数据三个视图。日报回答「今天要我处理什么」：每个候选六段，被拒和数据不足单独成表，每个数字回指决策 JSON。周报回答「改完省了吗、伤到服务没有」。月报回答「这套东西值不值得信」。
+- 证据：
+  - 样例：[`日报`](../reports/k8s-sample/daily.html)、[`周报`](../reports/k8s-sample/weekly.html)、[`月报`](../reports/k8s-sample/monthly.html)。
+  - 测试：[`test_report.py`](../finops_agent/k8s/test_report.py)，覆盖六段结构、摘要金额、数字落地及其反例、safe_halt 横幅、缺输入不崩。
+- 边界：是否真的读得懂，要靠维护者亲自读一份日报来判断（MATURITY 的 K12）。合并时我发现过一处误导：核实表把集群整体的节点数放在每一行，看起来 packing-trap 也省了一台节点。已改成只显示一次并加说明。
+
+### M8. 多 agent 构建：契约先行，产物扇出
+
+- 主张：主线由多个子 agent 分四波并行构建。每个 agent 有独立 worktree 和只许写的路径，同波任务之间没有数据依赖。主 agent 只合并，合并后自己重跑验证命令再打勾。所有对外动作（push、仓库改名、主页）走人工批准。
+- 证据：[`MATURITY.md`](MATURITY.md) 的主线一节、[`BUILD_PROCESS.md`](BUILD_PROCESS.md)、c0027 到 c0038 的 `git log`（每个 change 按阶段提交）。
+- 边界：只写路径是纪律，不是强制；两个 agent 同改 Makefile 时靠合并冲突暴露。报告读取的台账格式是另一个 agent 猜的，集成时才对齐。
+
+## 主线的成绩单
+
+同一个 agent 在四个世界上的成绩。前两列是它被做出来或被修过的世界，只是上界；最后一列是修复之前就冻结、修复之后只评一次的世界，是唯一能对外说的泛化数字。出处：[`eval/EXPERIMENTS.md`](../eval/EXPERIMENTS.md) §8、§9。
+
+| 指标 | 基础世界（样本内） | 第一个预注册世界，修复前 | 第一个预注册世界，修复后（已污染） | **第二个预注册世界** |
+|---|---|---|---|---|
+| 判定正确率 | 1.0（18/18） | 0.90（18/20） | 1.0 | **0.9167（22/24）** |
+| unsafe ALLOW（该拒却放行，硬闸） | 0 | **1** | 0 | **0** |
+| 数据不足判成 UNKNOWN 的比例 | 1.0 | 1.0 | 1.0 | **0.0（0/2）** |
+| 推荐值落在区间内 | 1.0 | 0.77 | 0.92 | **0.94** |
+
+这张表的读法：
+
+- **第一个预注册世界抓到了一次危险失败。** 一个内存持续上涨（泄漏）的服务，四个条件全部通过，被判可以降内存，因为规则里没有「趋势」。修复是在条件 B 里加趋势守卫：每日峰值做最小二乘，外推 14 天。同时修了 sidecar 混入用量、节点价格没传进来两处。
+- **修复之前，先盲写并冻结了第二个世界。** 用来找 bug 的世界不能度量修复：修完之后它对这些失败就被污染了，第三列的 1.0 只说明修复生效。
+- **第二个世界上，危险失败是 0，新失败换了一类。** 一个最后一周没有任何指标的 workload，在发现阶段就消失了，既没有判 UNKNOWN，也没有出现在报告里。它没有被放行，但 agent 对它沉默了。这条记为下一轮要修的问题，修之前要先冻结第三个世界。
+- **样本很小。** n=24，判定正确率 22/24 的 95% 区间约 [0.74, 0.98]。四个世界出自同一个作者家族，不是独立分布。
+
+---
+
+# 附录证据：广度扫描时期
+
+下面是改名之前（c0001 到 c0026）的十二项能力声明和成绩单，原样保留。
+
+## 十二项能力声明（广度扫描时期）
 
 ### 1. Context engineering：规则层决定上限
 
@@ -78,7 +168,7 @@
 - 证据：[`docs/diagrams/README.md`](diagrams/README.md)、[`../reports/index.html`](../reports/index.html)、[`../tools/build_index.py`](../tools/build_index.py)、c0019 [`openspec/changes/c0019-human-read-layer/evidence.md`](../openspec/changes/c0019-human-read-layer/evidence.md)。
 - 边界：图依赖 docker 里的 mermaid-cli 渲染，容器没有 CJK 字体，要看真浏览器的截图才能确认标签没被裁；导读页每次合并新 change 都会过期，要重新生成，这一点在构建中出过一次（BUILD_PROCESS 的事故一节）。
 
-## 诚实的成绩单
+## 广度扫描的成绩单
 
 ### 样本内 1.0 对预注册 0.75
 
@@ -121,7 +211,7 @@
 
 ## 读这个项目的顺序
 
-1. [`../README.md`](../README.md)：我怎么思考这个 agent、FinOps 方法、三层结果、进度表。
+1. [`../README.md`](../README.md)：主线的判定规则、日报样例、核实、成绩单、进度表。
 2. [`ARCHITECTURE.md`](ARCHITECTURE.md)：图和模块。
 3. [`../eval/EXPERIMENTS.md`](../eval/EXPERIMENTS.md)：数字从哪来，哪些能信。
 4. [`BUILD_PROCESS.md`](BUILD_PROCESS.md)：怎么用 agent 把它做出来，以及出过哪些事故。

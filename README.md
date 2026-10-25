@@ -20,118 +20,142 @@ Cost Optimization Hub 和 Compute Optimizer 已经能找出闲置和过配，也
 - **专门的决策逻辑**：什么时候能动，什么时候必须拒绝，缺什么数据才能判。
 - **可验证的执行闭环**：人批准之后，只在本地 k3d 集群上 canary 执行，命中停止条件就回滚；执行后核对节点数是否真的降了，requests 降了不等于省了钱。
 
-> 下文「第一部分」「第二部分」里关于 12 类 AWS 浪费的内容是早期的广度扫描，现在冻结为附录：代码和 `make eval` 仍然可以跑，但不再是主线指标。
+## 快速开始
+
+不需要 AWS 账号，也不需要 API key：合成的 K8s 世界由本地假 Prometheus 提供，LLM 的回答从录好的 cassette 回放。
 
 ```bash
 pip install -r requirements.txt
-make eval                    # 假 AWS + 假 Prometheus → 跑 agent → 对照标准答案打分
-open runs/local/report.html
+make k8s-eval      # 起假 Prometheus → agent 跑一遍 → 对照标准答案打分（CI 同一条命令）
+open runs/k8s-local/k8s_daily.html     # 这次运行的日报；同目录还有周报、月报
+make k8s-days      # 连续三天：提案去重、判定变化导致过期、负载漂移后重新提案
+make k8s-verify    # 改动之后真的省钱了吗：前后两段账单，按原因拆开
+make k8s-demo      # 需要 docker：本地 k3d 集群上走一遍「批准 → canary → 观察 → 回滚 / 核实」
 ```
 
-不需要 AWS 账号。合成账号和两个测试服务器见 [`testenv/README.md`](testenv/README.md)。
+已经生成好的样例报告：[日报](reports/k8s-sample/daily.html) · [周报](reports/k8s-sample/weekly.html) · [月报](reports/k8s-sample/monthly.html)。
 
 **入口**
 
 | 想知道什么 | 去哪 |
 |---|---|
-| 这个项目证明了什么（面试叙事，每条能力带证据和边界） | [`docs/NARRATIVE.md`](docs/NARRATIVE.md) |
+| 一个不了解项目的人每天收到什么 | [`reports/k8s-sample/daily.html`](reports/k8s-sample/daily.html) |
+| 判定规则的完整契约（输入、条件、顺序、产物） | [`openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md`](openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md) |
+| 改完真的省了吗 | [`docs/K8S_SAVINGS_VERIFICATION.md`](docs/K8S_SAVINGS_VERIFICATION.md) |
+| 哪些数字能信：样本内 vs 预注册 | [`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md) §8 起 |
+| 这个项目证明了什么 | [`docs/NARRATIVE.md`](docs/NARRATIVE.md) |
 | 完成标准逐条核对 | [`docs/MATURITY.md`](docs/MATURITY.md) |
-| 怎么用 agent 把它做出来 | [`docs/BUILD_PROCESS.md`](docs/BUILD_PROCESS.md) |
-| 模块、数据流、产物契约 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| 怎么参与改动 | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
-| 图、全部改动、指标一页看完 | [`reports/index.html`](reports/index.html) |
-| 测试账号的标准答案和陷阱（五段式） | [`reports/testenv-catalog.html`](reports/testenv-catalog.html) |
-| 省下的钱是不是真的 | [`docs/SAVINGS_VERIFICATION.md`](docs/SAVINGS_VERIFICATION.md) |
-| 判断层怎么评估，哪些数字能信 | [`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md) |
-| 清理之后怎么不复发 | [`docs/FINOPS_SLO.md`](docs/FINOPS_SLO.md) |
+| 怎么用多个 agent 把它做出来 | [`docs/BUILD_PROCESS.md`](docs/BUILD_PROCESS.md) |
+| 早期的 12 类 AWS 浪费扫描（冻结） | [`docs/APPENDIX_BREADTH.md`](docs/APPENDIX_BREADTH.md) |
 
 ---
 
 ## 我怎么思考这个 agent
 
-动手写代码之前我问了自己这些问题，回答决定了它现在的样子。每条都能追到 [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) 里编号的需求。
-
 | 问题 | 我的回答 |
 |---|---|
-| **为什么做它？** | 练习并展示 agent 工程能力：让一个 agent 在真实系统上可控、可度量、可改进。成本是好载体：每家公司都有这个问题，数据是结构化的，答错有实际代价。（R1、R15） |
-| **agent 工程和 agent 开发有什么区别？** | 开发是让模型把事做成。工程是决定它能碰什么、被告知什么、输出怎么检查、怎样变好而不倒退。Context 决定上限，harness 决定下限。（R1、R6） |
-| **模型弱在哪？** | 会编数字，会听从本该只读的文本，会偏离你设定的路径。所以：数字由代码算，资源元数据按不可信输入处理（测试账号里埋了一条注入），方法论固定路径。（R6） |
-| **判断还是验证？** | agent 做验证，不下断言。每个结论带证据，每个金额带口径，不变量拒绝不可能成立的答案，不管答案是谁给的。（R7） |
-| **"更好"指什么？** | 对照标准答案的数字：召回率、按金额加权的召回率、精确率、踩陷阱次数。基线只升不降，CI 强制。（R7） |
-| **为什么测试数据要难？** | 只会找闲置卷的 agent 是个脚本。真实的浪费藏在数据源的交叉处（成本 × 资产 × 利用率 × 有效工作），真实的陷阱长得像浪费。测试账号就是这样造的。（R2、R3） |
-| **从哪开始？** | 从目标开始。先定成本决策需要的 SLI，再去找指标。缺失的指标本身就是一条发现。（R17、R19） |
-| **清理之后呢？** | 会腐烂。成本健康要有 SLO、浪费预算、告警规则和巡检节奏，每次运行都和上一次比对，抓复发。（c0007） |
-| **它能做到哪一步？** | 只读，两层强制（hook、IAM）。修复只出计划；最难撤回的承诺折扣永远由人决定。（R4、R16） |
-| **过程即交付** | 每个改动都是一份 spec、按阶段的 commit、带证据的验收、一份 HTML 报告和原始笔记。代码看得见，推理过程也看得见。（R8、R9） |
-| **什么保持私有** | 雇主数据一律不进。只用合成数据和个人只读账号；每次提交都跑泄漏扫描。（REQUIREMENTS §4 约束） |
+| **为什么只做 CPU/Memory requests？** | 铺开 12 类浪费，每一类都只做到「找出来」。只做一类，才能把「能不能动、怎么动、动完省没省」整条链做实。K8s requests 同时有用量指标、声明式配置、扩缩容机制和服务 SLO，是闭环最完整的一块。 |
+| **AWS 已经有推荐，为什么还要它？** | Compute Optimizer 回答「这台机器过配了吗」。这里回答的是另外三件事：这个服务现在允许动吗（SLO、错误预算、批任务 deadline），降完扛得住吗（峰值、throttling、OOM、HPA 联动），动完账单真的会变吗（节点装箱）。 |
+| **LLM 在哪里，不在哪里？** | 判定由确定性代码给出，LLM 不碰。LLM 只做两件事：把一条决策写成人能读的解释和提案，指出什么证据会让判定改变。它写的每个数字都要能在证据里找到，找不到的句子被抹掉并留痕。 |
+| **缺数据怎么办？** | 显式 UNKNOWN，并写明补什么数据就能判。UNKNOWN 永远不被当成通过。数据不够时说「不知道」，比给一个看起来合理的数字安全。 |
+| **它能动手吗？** | 能，但只在人批准之后，只在本地 k3d 测试集群（`k3d-finops-test`）。项目 hook 拦掉其他任何 context 上的 kubectl 写操作和不带 `# INTENT:` 的写操作。执行前重读现场状态，和计划不一致就不执行；观察期内命中停止条件就自动回滚，并验证回滚后的资源等于变更前。 |
+| **怎么知道它变好了而不是变差？** | 对照标准答案打分，unsafe ALLOW（该拒却放行）是硬闸，必须为 0。样本内的 1.0 不算数：每次修复之前，先盲写一个新世界并冻结，修完只评一次。第一个预注册世界抓到了一条 unsafe ALLOW。 |
+| **省钱怎么算？** | 两个口径分开报，不能相加：账面释放的预留（request 降了多少），和节点能缩才兑现的钱（装箱模拟后少开几台节点）。执行之后再用前后两段账单核实，偏差按原因拆开。 |
+| **过程即交付** | 每个改动是一份 OpenSpec change、按阶段的 commit、带原始输出的验收证据、一份 HTML 报告和一份原始笔记。 |
+| **什么保持私有** | 雇主数据一律不进。只用合成数据；每次提交跑泄漏扫描。 |
 
 ---
 
-## 第一部分 · FinOps
+## 第一部分 · FinOps：一个 workload 的 requests 怎么判
 
 ### 1.1 领域模型
 
-每一行成本都是 **单价 × 用量 × 时长**，挂在（或没挂在）某个**资源**上，资源归属（或不归属）某个**服务**和**团队**。优化就是动这三个因子中的一个；归因决定谁来动手。
+一个 Deployment 的成本不是它用了多少，而是它**预留**了多少：调度器按 requests 把 pod 装进节点，节点按小时计费。降 requests 只有在节点数因此变少时才省钱。
 
-| 概念 | 是什么 | agent 从哪读 |
+| 输入 | 回答什么 | 从哪来 |
 |---|---|---|
-| 花费 | 按服务、用量类型、资源、tag 拆分的账单行；unblended 与 amortized 两种口径 | Cost Explorer |
-| 资源 | 实例、卷、快照、镜像、IP、NAT 网关、启动模板、ASG | EC2 / Auto Scaling API |
-| 归属 | `owner` / `service` / `env` tag，以及可能和它们矛盾的事实（启动模板、ASG、指标标签） | tag + 资产 + 指标 |
-| 计价模式 | 按需、Savings Plan / RI（含利用率）、牌价 | Cost Explorer、Savings Plans API |
-| 用量信号 | 利用率（CPU、网络），以及**有效工作**（成功的 job、处理的请求） | Prometheus |
-| 约束 | 一份容量在保护的 SLO（延迟余量、DR 温备） | 指标 + tag |
-| 共享成本 | 不挂资源的行：NAT 处理费、跨 AZ 流量、承诺费用 | Cost Explorer 用量类型 |
+| **Metrics** | 实际发生了什么：每 pod 的 CPU 核数、内存 working set、throttling、OOM、重启、延迟 | Prometheus（cAdvisor、kube-state-metrics 风格） |
+| **SLO** | 业务允许发生什么：可用性目标、p99 目标、批任务 deadline | SLO 目录文件（独立输入）；燃烧率和剩余预算来自指标 |
+| **Requests** | 调度器为它预留多少：requests、limits、副本数、HPA | kube-state-metrics |
+| 节点与价格 | 一台节点能装多少、多少钱、最多扩到几台 | 集群描述（`nodes`、`pricing`） |
 
-浪费有几种形态，各自需要不同的证据：
+三类输入不能互相替代。没有 SLO 时，不拿「利用率很低」去推断「可以降」；deadline 写在 SLO 里，就不从指标里猜。
 
-| 形态 | 例子 | 最少需要的证据 |
+### 1.2 判定：四个条件和判定顺序
+
+推荐值由公式算出（CPU 取 14 天 p99 加 30% 余量，内存取峰值 working set 加 20% 余量），然后对推荐值评四个条件，每个条件给 PASS、FAIL 或 UNKNOWN：
+
+| 条件 | 问什么 | 例子 |
 |---|---|---|
-| 闲置 | 未挂载的卷、未关联的 IP | 资产状态 |
-| 搁浅 | 停机数月的实例上的卷；已删卷的快照 | 资产关联 + 成本 |
-| 忙但无用 | CPU 60% 但 job 全部失败的 fleet | 成本 + 利用率 + **工作结果**指标 |
-| 路径成本 | 被重试放大的 NAT 字节；跨 AZ 频繁通信的服务 | 用量类型成本 + 拓扑 + 流量指标 |
-| 搁浅的承诺 | fleet 迁走后覆盖不到的 Savings Plan | 利用率历史 + 资产 |
-| 归因错误 | tag 写一个团队，实际跑另一个团队的任务 | tag vs 启动模板 vs 指标标签 |
-| **不是浪费** | 平均低、峰值真实的潮汐 fleet；DR 温备 | 峰值分布、SLO、意图 tag |
+| A 数据足够 | 有效天数和样本覆盖率够不够，峰值和周期有没有被覆盖 | 新服务只有 5 天数据 → UNKNOWN |
+| B 资源余量 | 降完还扛得住吗：p99 余量、高峰 throttling、OOM、峰值逼近 limit、集群 Pending | 平均 15% 但每天高峰到 90% 且 throttling → FAIL |
+| C 服务健康 | SLO 允许变更吗：燃烧率、剩余错误预算、批任务离 deadline 多远 | 正在烧错误预算 → FAIL，冻结优化 |
+| D 可恢复 | 有快照和回滚命令；回滚时集群有没有空间（允许依赖节点扩容） | 回滚需要的容量超过节点上限 → FAIL |
 
-### 1.2 我怎么做成本优化
+判定按顺序，命中即停：
 
-完整方法：[`docs/METHOD.md`](docs/METHOD.md)。
+```mermaid
+flowchart LR
+  S([一条推荐]) --> C1{C 失败?}
+  C1 -- 是 --> DENY1[DENY 冻结]
+  C1 -- 否 --> A1{A 通过?}
+  A1 -- 否 --> UNK[UNKNOWN 写明缺什么]
+  A1 -- 是 --> B1{B 或 D 失败?}
+  B1 -- 是 --> DENY2[DENY 写明风险]
+  B1 -- 否 --> N1{推荐值 ≥ 当前?}
+  N1 -- 是 --> NOOP[NOOP 无需调整]
+  N1 -- 否 --> R1{有 UNKNOWN 或 HPA 联动?}
+  R1 -- 是 --> RA[REQUIRE_APPROVAL]
+  R1 -- 否 --> AL[ALLOW]
+```
 
-![方法 M0 到 M6](docs/diagrams/method.svg)
+顺序本身是设计：服务正在退化时不该动，不管数据多不多，所以 C 失败排在数据不足之前；B 的风险守卫（OOM、throttling）按当前状态评估，排在 NOOP 之前，否则「已经快 OOM 的内存」会被判成「无需调整」。
 
-**两个层级。** 运营级优化动单价（删、降配、换存储类、买承诺），天花板是折扣率。架构级优化动用量或时长（缩到零、批任务改成临时任务、改数据路径），天花板是数量级。每份账单里两类都有，架构级的藏得更深。
+### 1.3 一份日报长什么样
 
-**七步，按顺序。** M0 看数据之前先定成本目标和它的 SLI → M1 归因 → M2 二八排序与意外项 → M3 清理 → M4 降配与调度 → M5 承诺折扣 → M6 架构级。先删再降最后买：先买承诺等于给浪费上锁。
+报告写给一个没有参与开发的人。日报回答「今天有什么要我处理」：顶部一行摘要（可兑现多少钱、待批准几条、被拒几条、数据不足几条），然后和上次比有什么变化，然后每个候选一张卡片，固定六段：
 
-**硬规则。**
+| 段 | 写什么 |
+|---|---|
+| 现状 | request、limit、副本数；14 天用量的 p50/p95/p99/max；高峰时段、throttling、OOM |
+| 证据 | 每个数字的查询语句、时间窗、数据完整度 |
+| 做了哪些分析 | A、B、C、D 逐条的状态和依据 |
+| 怎么做 | 新值、patch 命令、回滚命令、canary 范围、观察多久、停止条件、批准文件路径 |
+| 做完应该是什么样 | 第一句先说钱动不动、为什么；预期利用率和余量；节点数从几台到几台 |
+| 结论 | 判定和一句理由；模型写的解释（标明来源、数字已核对）和「什么情况下判定会变」 |
 
-- 余量对 SLO 负责。"70%"只是一个数字，砍之前先问它在保护哪条 SLO。
-- 潮汐不是浪费。峰值能降下来是弹性；一直降不下来的容量才是浪费。
-- 承诺会改写节省。停掉被一个用不满的 Savings Plan 覆盖的用量，省不到钱。
-- 一个根因可能抬高好几行账单。先找到它，再分别算钱。
-- 节省不会超过花费。超过了，说明归因错了。
-- 每个金额标明口径：已对账、牌价估算或推断。
-- 清理会腐烂。成本健康和可靠性一样，需要 SLO、浪费预算、告警和巡检节奏。见 [`docs/FINOPS_SLO.md`](docs/FINOPS_SLO.md)。
-- 消失不等于解决。资源还在、成本没变的 finding 是漏检（`not_redetected`），只有资源或成本变了才算 `resolved`。
-- 省钱要核实。两张发票相减会得出「清理没效果」，要用对照组和账单分解算真实节省，见 [`docs/SAVINGS_VERIFICATION.md`](docs/SAVINGS_VERIFICATION.md)。
+被拒和数据不足单独一张表：哪个条件、为什么、补什么数据或做什么就能改判。它和「能省多少」同样重要。周报回答「上周的改动真的省了吗、有没有伤到服务」；月报回答「这套东西值不值得信」。
 
-![腐烂生命周期与巡检节奏](docs/diagrams/rot-lifecycle.svg)
+### 1.4 改完真的省了吗
 
-### 1.3 在测试账号上的当前结果
+requests 降了不等于账单降了。核实比较变更前后两段窗口的节点小时账单，并把变化精确拆成五类原因：变更本身、无关的负载增长、变更引发的 HPA 扩容、回滚、装箱没兑现。合成场景里（`make k8s-verify`）：
 
-三层结果分开报，因为它们证明的东西不同。数字来自 [`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md) §7.3 和 `python3 -m eval.heldout`（回放，约 10 秒）。
+| 变更 | 预测 /月 | 实际 /月 | 原因 |
+|---|---|---|---|
+| api-steady cpu | $140.16 | $140.16 | 节点 6 → 5，全部兑现 |
+| packing-trap cpu | $0 | $0 | 账面释放 $36.91，但节点被内存钉住，一台也空不出来 |
+| hpa-managed cpu | $0 | $0 | 腾出的容量吸收了无关增长（+$70.08），HPA 因利用率变高多开副本（−$70.08） |
+| no-slo cpu | $140.16 | $0 | 被回滚，又被无关增长占掉位置 |
 
-| 层 | 世界 | recall | 按金额加权 recall | 深层 recall | 踩陷阱 | 它证明什么 |
-|---|---|---|---|---|---|---|
-| 样本内 | 基础世界（prompt 对着它调过） | 1.0 | 1.0 | 1.0 | 0 | 判断层在这个账号上把跨源判断做到顶，是上界，不是泛化指标 |
-| 样本外（已污染，见 EXPERIMENTS §6） | next_month、month_after | 1.0 / 1.0 | 1.0 / 1.0 | 1.0 / 1.0 | 0 | 只说明 c0023 的修复有效；第一次评估是 0.9 / 0.9091，之后对着失败修过，这两个世界不再是样本外 |
-| 预注册的全新世界 | fresh_world（货运 SaaS，冻结后只评估一次） | 0.75 | 0.568 | 0.667 | 1 | 唯一没被污染的泛化数字：换一个世界会掉，漏检在确定性检测与取证层，判断层 8 个判断全部被接受 |
+合计预测 $280.32，实际 $140.16，各原因之和与账单变化的差在 1e-13 以内。场景参数是为了让每类偏差各出现一次而挑的，它证明的是核实器能把账单拆对，不是这些偏差在真实集群里的比例。详见 [`docs/K8S_SAVINGS_VERIFICATION.md`](docs/K8S_SAVINGS_VERIFICATION.md)。
 
-作为对照，只开确定性层、不开判断层时，基础世界 recall 0.5833，金额加权 0.1888（[`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md) §0）。
+### 1.5 成绩：哪些数字能信
 
-基础世界上其余指标：精确率 1.0，金额落在区间内 0.9167，方法步骤一致 1.0，违反不变量 0。预注册世界上精确率 1.0，金额落在区间内 0.5385（其中有评分粒度的成分，见 §7.5 勘误）。三个已知漏检（持平的 NAT 异常、跨 AZ 取证、非模板路径的错标）和一个陷阱违规（保留 tag 的卷）是后续工作，见 [`docs/NARRATIVE.md`](docs/NARRATIVE.md) 的诚实成绩单。
+同一个 agent 在四个世界上的成绩。前两列是它被做出来或被修过的世界，只是上界；最后一列是修复之前就冻结、修复之后只评一次的世界，是唯一能对外说的泛化数字。出处：[`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md) §8、§9。
+
+| 指标 | 基础世界（样本内） | 第一个预注册世界，修复前 | 第一个预注册世界，修复后（已污染） | **第二个预注册世界** |
+|---|---|---|---|---|
+| 判定正确率 | 1.0（18/18） | 0.90（18/20） | 1.0 | **0.9167（22/24）** |
+| unsafe ALLOW（该拒却放行，硬闸） | 0 | **1** | 0 | **0** |
+| 数据不足判成 UNKNOWN 的比例 | 1.0 | 1.0 | 1.0 | **0.0（0/2）** |
+| 推荐值落在区间内 | 1.0 | 0.77 | 0.92 | **0.94** |
+
+这张表的读法：
+
+- **第一个预注册世界抓到了一次危险失败。** 一个内存持续上涨（泄漏）的服务，四个条件全部通过，被判可以降内存，因为规则里没有「趋势」。修复是在条件 B 里加趋势守卫：每日峰值做最小二乘，外推 14 天。同时修了 sidecar 混入用量、节点价格没传进来两处。
+- **修复之前，先盲写并冻结了第二个世界。** 用来找 bug 的世界不能度量修复：修完之后它对这些失败就被污染了，第三列的 1.0 只说明修复生效。
+- **第二个世界上，危险失败是 0，新失败换了一类。** 一个最后一周没有任何指标的 workload，在发现阶段就消失了，既没有判 UNKNOWN，也没有出现在报告里。它没有被放行，但 agent 对它沉默了。这条记为下一轮要修的问题，修之前要先冻结第三个世界。
+- **样本很小。** n=24，判定正确率 22/24 的 95% 区间约 [0.74, 0.98]。四个世界出自同一个作者家族，不是独立分布。
 
 ---
 
@@ -139,25 +163,46 @@ open runs/local/report.html
 
 ### 2.1 设计
 
-![架构：模块与分层](docs/diagrams/architecture.svg)
-
-![数据流：产物谁写谁读](docs/diagrams/dataflow.svg)
+```mermaid
+flowchart TB
+  subgraph IN["三类独立输入（只读）"]
+    M["Metrics<br/>Prometheus"]
+    SLO["SLO 目录"]
+    REQ["Requests<br/>kube-state-metrics"]
+  end
+  COL["collect.py<br/>每个数字一条证据：查询、窗口、值"]
+  REC["recommend.py<br/>p99 / 峰值 + 余量"]
+  PACK["packing.py<br/>FFD 装箱：两种节省口径"]
+  POL["policy.py<br/>A–D + 判定顺序（确定性）"]
+  NAR["narrate.py<br/>LLM：每条决策隔离调用<br/>数字落地校验，cassette 回放"]
+  PLAN["plans.py<br/>patch / rollback / 停止条件"]
+  LED[("k8s_state.json<br/>提案台账")]
+  ACT["act.py<br/>批准文件 · context 闸 · 漂移闸<br/>canary → 观察 → 回滚"]
+  K3D[("k3d-finops-test")]
+  VER["verify.py<br/>前后账单，五类原因"]
+  REP["report.py<br/>日报 / 周报 / 月报"]
+  HOOK["hooks/aws_readonly_guard.py<br/>其他 context 的 kubectl 写一律拦"]
+  M & SLO & REQ --> COL --> REC --> PACK --> POL --> NAR --> PLAN --> LED
+  PLAN -- 人批准 --> ACT --> K3D
+  ACT --> LED
+  K3D --> VER --> REP
+  LED --> REP
+  POL --> REP
+  HOOK -.-> ACT
+```
 
 | 层 | 职责 | 为什么单独一层 |
 |---|---|---|
-| 采集 | 拉资产、成本、指标；每次调用留痕 | 唯一接触外部世界的层，从构造上就是只读 |
-| 快照 | 冻结输入 | 运行可以精确重放；答错了能复现 |
-| 检测器 | 算术和关联，每个对应一个方法步骤 | 每个数字可复算；这一层没有模型 |
-| 线索 | 需要跨源判断的信号，附待回答的问题 | 模型拿到的是问题和证据，不是原始数据堆 |
-| 判断 | 每条线索一次独立的 LLM 调用：代码取证并算出候选金额，模型只选；录制回放（cassette），CI 不需要 API key | LLM 真正产生价值的地方，也是被评估的地方；模型不做算术 |
-| 落地与脱敏 | 模型输出的数字必须取自证据；叙述里未落地的数字按从句脱敏并留痕，结构化字段不落地才整条拒绝 | 校验器不能成为攻击面：「fail closed」会让攻击者靠数字诱饵压掉真 finding |
-| 不变量 | 节省 ≤ 花费、必须有口径、必须有证据 | 不管答案是谁给的，错的都会被拦下 |
-| 处置计划 | 每个有节省的发现一份 dry-run 计划（撤回成本、回滚、前置检查），无 `--approve` 不执行；承诺折扣只给建议 | 高撤回成本的动作由人决定 |
-| 五段式卡片 | 每条发现与每条标准答案读成：现状、期望、差异、处置、预防 | 从「是什么」一路读到「怎么防复发」，数字由代码算 |
-| 可见性链 | 目标优先：需求（可由 LLM 推导，只写词不写名）→ 计划（按语义发现指标名）→ 搜索 → 缺口 | 缺失的指标也是发现 |
-| 评估 | 对照标准答案打分；陷阱；回归基线；样本内、样本外、预注册新世界分开报 | 「更好」是一个数字，CI 强制；样本外是流程属性，冻结在前才算数 |
-| SLO 与腐烂 | 每次运行算 SLI、浪费预算、跨运行的新增 / 持续 / 已解决 / 复发 / 未再检出（`not_redetected`）；导出 Prometheus 指标和告警规则 | 清理会腐烂，下一次运行必须察觉；漏检不能伪装成整改 |
-| 省钱核实 | 用前后两期 Cost Explorer 算反事实基线、对照组和账单分解，核对 resolved 的发现是否真的省钱 | 预测不等于兑现：场景链预测 $744.21，实现 $140.60（18.9%） |
+| 采集 | 按契约的指标名取数，每个数字附查询、窗口和数据完整度 | 唯一接触外部的读路径；证据从这里开始编号 |
+| 推荐与装箱 | 公式推荐；对整个集群做 FFD 装箱，算出「只做这一条」能少几台节点 | 节省是集群属性，不是 workload 属性 |
+| 策略引擎 | 四个条件、六步判定顺序，阈值都在 `config/k8s_policy.yaml` | 安全条件必须能被独立检查，不能只存在于 prompt 里 |
+| 叙述（LLM） | 每条决策一次独立调用，只拿这一条的证据；输出过数字落地校验；断言判定没被改 | 模型擅长解释，不该做判定，也不该编数字 |
+| 计划与台账 | 只给 ALLOW 和 REQUIRE_APPROVAL 出计划；台账做去重、过期、冻结 | 每天跑一次也不会重复提案；SLO 退化时全局 safe_halt |
+| 执行 | 批准文件、context、现场状态三道闸；canary、观察、停止条件、自动回滚并验证 | 执行权在人手里，回滚不靠人记得 |
+| 核实 | 前后两段账单，五类原因精确分解 | 预测不等于兑现 |
+| 报告 | 一份数据、三个视图，每个数字回指决策 JSON | 读报告的人不需要读代码 |
+| 评估 | 对照标准答案打分；unsafe ALLOW 硬闸；预注册世界冻结在前、只评一次 | 「更好」是一个数字，CI 强制 |
+
 
 ### 2.2 设计原则
 
@@ -165,14 +210,14 @@ open runs/local/report.html
 
 | 原则 | 靠什么落实 |
 |---|---|
-| 可验证先于正确 | 每条发现带证据；对照标准答案评估 |
-| 隔离、处理、验证 | 只读采集、冻结快照、只出 dry-run 计划 |
-| 数据优于观点 | 检测器负责计算；模型从不做算术 |
-| 误差会级联放大 | `节省 ≤ 花费` 不变量；金额带口径 |
+| 可验证先于正确 | 每个数字带查询和窗口；对照标准答案评估，unsafe ALLOW 是硬闸 |
+| 隔离、处理、验证 | 只读采集；执行只在批准后、只在测试集群；执行后核实 |
+| 数据优于观点 | 推荐、装箱、判定都是确定性代码；模型只写解释 |
+| 误差会级联放大 | 两种节省口径分开报、不相加；核实时账单分解必须精确闭合 |
 | agent 是不可靠组件，SRE 是它的外壳 | hook、服务端拒绝写、IAM、评估闸门 |
 | 责任不能委派 | 写操作需要人；报告区分事实与推断 |
-| 以终为始 | 查任何指标之前先走可见性链第 ① 环 |
-| 上下文隔离 | 每条线索只带判断它所需的证据 |
+| 以终为始 | 先定 SLO 和容量约束，再谈降多少；缺约束就是 UNKNOWN |
+| 上下文隔离 | 每条决策一次独立的 LLM 调用，只带这一条的证据 |
 | 文档即记忆 | 规则层、OpenSpec 改动、每个改动一份笔记 |
 
 ### 2.3 怎么构建
@@ -237,11 +282,13 @@ open runs/local/report.html
 
 | 路径 | 用途 |
 |---|---|
-| `finops_agent/` | 流水线：采集 → 快照 → 检测器 → 判断层（`finops_agent/judge/`、`finops_agent/llm.py`）→ 处置计划、五段式 → SLO → 报告；省钱核实 `finops_agent/verify_savings.py` |
+| `finops_agent/k8s/` | 主线：collect → recommend → packing → policy → narrate → plans → ledger → act → verify → report |
+| `finops_agent/` | 附录（广度扫描）流水线：采集 → 快照 → 检测器 → 判断层（`finops_agent/judge/`、`finops_agent/llm.py`）→ 处置计划、五段式 → SLO → 报告；省钱核实 `finops_agent/verify_savings.py` |
+| `testenv/k8s_world.yaml`、`testenv/k8s_slos.yaml` | 主线的合成 K8s 世界与 SLO 目录；场景在 `testenv/k8s_scenarios/`，预注册世界在 `testenv/heldout/` |
 | `testenv/` | 合成账号、两个测试服务器、场景覆盖层（`testenv/scenarios/`）、预注册世界（`testenv/heldout/`）、目录页生成器 |
 | `eval/` | 打分器、回归基线、样本内/外评估、对抗测试、LLM cassette（`eval/cassettes/`）、实验记录 |
 | `config/` | 可见性需求（第 ① 环）、FinOps SLO、告警规则（`config/alerts/`） |
-| `ops/` | 巡检节奏（`crontab.example`） |
+| `ops/` | k3d 演示清单与 demo 应用（`ops/k3d/`）；巡检节奏（`crontab.example`） |
 | `docs/` | 需求、方法、架构、叙事、成熟度、构建过程、SLO、省钱核实、蒸馏来源、AWS 加固、六张图（`docs/diagrams/`） |
 | `rules/` | 项目规则层 |
 | `hooks/` | 护栏（注册在 `.claude/settings.json`） |
@@ -249,7 +296,7 @@ open runs/local/report.html
 | `.claude/skills/` | 项目 skill（`finops-change-loop` + OpenSpec skill） |
 | `reports/`、`notes/blog/` | 每个改动的 HTML 报告和原始笔记；`reports/index.html` 是生成的导读页 |
 | `tools/` | 仓库自检（`check_rules.py`：规则层完整性 + 泄漏扫描）、导读页生成（`build_index.py`）、规则同步提议（`sync_rules.py`） |
-| `scripts/` | 端到端演示：三周期腐烂（`rot_demo.sh`）、省钱核实（`verify_savings.sh`） |
+| `scripts/` | 主线：`k8s_demo.sh`、`k8s_days.sh`、`k8s_verify.sh`、`k8s_report_samples.sh`；附录：`rot_demo.sh`、`verify_savings.sh` |
 
 ## 许可证
 
