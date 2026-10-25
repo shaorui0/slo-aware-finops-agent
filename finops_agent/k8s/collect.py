@@ -102,6 +102,34 @@ def _num(s):
     return v if math.isfinite(v) else None
 
 
+def daily_trend(series: dict, start: float, days: int, min_hours: int, min_points: int, horizon: float) -> dict | None:
+    """Least-squares line through the per-day maxima of an hourly {ts: value} series (24h buckets anchored at the window start;
+    a bucket needs `min_hours` points). -> {slope, r2, fit_start, fit_end, projected, points, rise} (per-day units), or None
+    when fewer than `min_points` days qualify. projected = fit_end + slope * horizon; no rounding here."""
+    daily, count = {}, {}
+    for ts, v in series.items():
+        k = int((ts - start) // 86400)
+        if 0 <= k < days:
+            daily[k] = max(daily.get(k, v), v)
+            count[k] = count.get(k, 0) + 1
+    pts = sorted((k, v) for k, v in daily.items() if count[k] >= min_hours)
+    if len(pts) < min_points:
+        return None
+    n = len(pts)
+    mx, my = sum(k for k, _ in pts) / n, sum(v for _, v in pts) / n
+    sxx = sum((k - mx) ** 2 for k, _ in pts)
+    sxy = sum((k - mx) * (v - my) for k, v in pts)
+    slope = sxy / sxx
+    icpt = my - slope * mx
+    ss_tot = sum((v - my) ** 2 for _, v in pts)
+    ss_res = sum((v - (icpt + slope * k)) ** 2 for k, v in pts)
+    r2 = 1.0 if ss_tot == 0 else 1 - ss_res / ss_tot
+    k0, k1 = pts[0][0], pts[-1][0]
+    fit_start, fit_end = icpt + slope * k0, icpt + slope * k1
+    return {"slope": slope, "r2": r2, "fit_start": fit_start, "fit_end": fit_end, "rise": slope * (k1 - k0),
+            "projected": fit_end + slope * horizon, "points": n, "horizon_days": horizon}
+
+
 def _iso(ts):
     return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -234,8 +262,9 @@ class Collector:
                     m["obj_" + k] = (f"{ref}.{k}", "catalog", _num(entry["objectives"][k]))
         return m, hpa
 
-    def resource_measures(self, ns, wl, resource):
-        sel = f'namespace="{ns}",workload="{wl}"'
+    def resource_measures(self, ns, wl, resource, container=None):
+        # a sidecar shares the workload label: once the application container is known, every per-container selector is pinned to it
+        sel = f'container="{container}",namespace="{ns}",workload="{wl}"' if container else f'namespace="{ns}",workload="{wl}"'   # kube-state label order
         cpu = resource == "cpu"
         metric, scale = (CPU_USAGE, 1.0) if cpu else (MEM_WS, 1 / GIB)
         m = {}
@@ -277,7 +306,23 @@ class Collector:
             ratios = [thr[ts] / per[ts] for ts in sorted(per) if ts in thr and per[ts] > 0 and int(ts // HOUR) % 24 in peak]
             throttle = max(ratios) if ratios else None
             m["throttle"] = (f"({qt_}) / ({qp})", w, None if throttle is None else round(throttle, 6))
-        return m, valid_days, coverage, peak, throttle
+
+        trend = None
+        if resource in (pol.get("trend_resources") or []):
+            tr = daily_trend({ts: v * scale for ts, v in series.items()}, self.t - self.days * 86400, self.days, pol["valid_day_min_hours"],
+                             pol["trend_min_points"], pol["trend_horizon_days"])
+            if tr is not None:
+                trend = {k: (round(v, 6) if isinstance(v, float) else v) for k, v in tr.items()}
+                trend["triggered"] = (tr["slope"] > 0 and tr["r2"] >= pol["trend_min_r2"]
+                                      and tr["rise"] >= pol["trend_min_rise"] * max(tr["fit_start"], 0.0))
+                if trend["triggered"]:
+                    # evidence only when the trend is a factor in the decision (like the job rows, which only a batch job has).
+                    # The "query" is descriptive (the data is the hourly query above, reduced to per-day maxima) and kept apart
+                    # from the real PromQL so that it is not mistaken for another usage statistic.
+                    m["trend_slope"] = (f"ols_slope_per_day(daily_max({metric}{{{sel}}}))", f"{self.days}d@1d", round(tr["slope"], 6))
+                    m["trend_proj"] = (f"ols_projection(daily_max({metric}{{{sel}}}), +{pol['trend_horizon_days']:g}d)",
+                                       f"{self.days}d@1d+{pol['trend_horizon_days']:g}d", round(tr["projected"], 6))
+        return m, valid_days, coverage, peak, throttle, trend
 
 
 def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing: dict | None = None,
@@ -291,10 +336,11 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
     for ns, wl, team in c.workloads():
         shared, hpa = c.shared(ns, wl)
         for resource in ("cpu", "memory"):
-            rm, valid_days, coverage, peak, throttle = c.resource_measures(ns, wl, resource)
+            rm, valid_days, coverage, peak, throttle, trend = c.resource_measures(ns, wl, resource, shared["container"])
             book = Evidence()
             order = ["request", "limit"] + ["replicas"] + ["p50", "p95", "p99", "max", "valid_days", "coverage", "peak_hours"]
             order += ["throttle"] if resource == "cpu" else []
+            order += [k for k in ("trend_slope", "trend_proj") if k in rm]
             for k in order:
                 src = shared if k == "replicas" else rm
                 book.add(k, *src[k])
@@ -311,7 +357,7 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
                 "usage": {"p50": rm["p50"][2], "p95": rm["p95"][2], "p99": rm["p99"][2], "max": rm["max"][2],
                           "valid_days": valid_days, "coverage": round(coverage, 6), "peak_hours_utc": peak,
                           "throttle_peak": None if throttle is None else round(throttle, 6),
-                          "oom_events": shared["oom"][2]},
+                          "oom_events": shared["oom"][2], "trend": trend},
                 "hpa": hpa,
                 "container": shared["container"],
                 "slo": {"burn_rate_1h": shared["burn"][2], "budget_remaining": shared["budget"][2],

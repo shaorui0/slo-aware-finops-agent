@@ -97,6 +97,15 @@ def cond_b(f, rec, cluster, policy):
         if lim and u.get("max") is not None and u["max"] >= policy["oom_guard"] * lim:
             fails.append(f"峰值 {u['max']:g} GiB ≥ {policy['oom_guard']:g} × limit {lim:g} GiB，已贴近 OOM")
         ok = f"推荐 ≥ 峰值 × (1+{margin:g})，无 OOMKilled，" + (f"峰值 < {policy['oom_guard']:g} × limit" if lim else "未设 limit，OOM 判据不适用")
+    tr = u.get("trend")
+    if tr:
+        keys = keys + ["trend_slope", "trend_proj"]
+        unit = "core" if res == "cpu" else "GiB"
+        need = tr["projected"] * (1 + margin)
+        if tr.get("triggered") and rec is not None and rec["request"] < need - 1e-9:
+            fails.append(f"使用量持续爬升：每日峰值的最小二乘斜率 {tr['slope']:g} {unit}/天（R² {tr['r2']:g}），"
+                         f"按此外推 {tr['horizon_days']:g} 天后峰值约 {tr['projected']:g} {unit}，"
+                         f"推荐 {rec['request']:g} {unit} 低于 {tr['projected']:g} × (1+{margin:g})，先查泄漏或增长")
     if pending is None:
         unknowns.append(("缺少集群 Pending pod 数", "需要 kube_pod_status_phase{phase=\"Pending\"}"))
     elif pending > 0:
@@ -232,7 +241,7 @@ def decide_one(f, cluster, policy, base_nodes, base_pods):
     return _r({
         "id": f.get("id") or f"K-{f['namespace']}-{f['workload']}-{res}",
         "workload": f["workload"], "namespace": f["namespace"], "team": f.get("team", ""), "resource": res,
-        "current": dict(cur), "usage": dict(f["usage"]),
+        "current": dict(cur), "usage": {k: v for k, v in f["usage"].items() if k != "trend"},   # the trend fit is in B's why and evidence
         "recommendation": rec or {"request": None, "method": None, "headroom": h},
         "savings": sav,
         "conditions": conds,

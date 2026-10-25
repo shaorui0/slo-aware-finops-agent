@@ -1,0 +1,32 @@
+{
+  "verdict_accuracy": 1.0,
+  "unsafe_allow": 0,
+  "unknown_recall": 1.0,
+  "request_in_range": 0.9231,
+  "realizable_accuracy": 1.0,
+  "n": {
+    "expected": 20,
+    "decisions": 20,
+    "unknown_expected": 2,
+    "ranged": 13,
+    "realizable": 3
+  },
+  "wrong_verdicts": [],
+  "unsafe_allow_ids": [],
+  "out_of_range": [
+    {
+      "id": "route-quote/cpu",
+      "request": 0.3,
+      "range": [
+        1.5,
+        1.9
+      ]
+    }
+  ],
+  "realizable_misses": [],
+  "not_in_world": [],
+  "narrative_ungrounded": [],
+  "narrative_sources": {
+    "llm": 20
+  }
+}

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0037-k8s-fix-heldout-misses</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0037-k8s-fix-heldout-misses</h1>
+</header>
+<h1 id="c0037-修预注册世界暴露的漏检">c0037 修预注册世界暴露的漏检</h1>
+<h2 id="改了什么为什么">改了什么、为什么</h2>
+<h3 id="why">Why</h3>
+<p>c0035 在预注册的新世界上暴露了 agent
+一侧的三类缺陷（<code>eval/EXPERIMENTS.md</code> §8.4）：一条 unsafe
+ALLOW（内存持续爬升被放行）、sidecar 污染用量、定价输入通道不通。这个
+change
+修这三条。第一个预注册世界（c0035）因为它的失败驱动了这次修复，此后只能当回归测试，不能再当泛化证据；泛化要靠另一个更晚冻结的世界（由别人评估一次）。</p>
+<h3 id="what-changes">What Changes</h3>
+<ol type="1">
+<li><strong>趋势守卫（条件 B 增加一个子项）。</strong>
+取窗口内每天的最大 working
+set（<code>max by (workload)(max_over_time(&lt;metric&gt;{...}[1d]))</code>，1d
+步长的 range query），做最小二乘线性回归；按拟合线外推
+<code>trend_horizon_days</code>（默认 14 天）得到预测峰值，若
+<code>预测峰值 × (1+margin) &gt; 推荐 request</code> 则 B FAIL（verdict
+DENY），理由用中文并写明斜率、R²、预测值。触发时证据新增两条：斜率（GiB/天）与外推峰值；未触发的序列不加证据条目。只有同时满足「斜率为正、R²
+≥ <code>trend_min_r2</code>、窗口内拟合涨幅 ≥
+<code>trend_min_rise</code>、点数 ≥
+<code>trend_min_points</code>」才触发，避免昼夜与周周期的噪声造成误判。</li>
+<li><strong>按容器过滤。</strong>
+用量（p50/p95/p99/max、逐小时序列）、throttling、requests、limits
+的选择器加 <code>container="&lt;name&gt;"</code>，容器名取自本轮早先
+<code>kube_deployment_spec_replicas</code> 的 <code>container</code>
+标签。没有该标签时沿用旧选择器。</li>
+<li><strong>定价通道。</strong>
+<code>--nodes-from &lt;world.yaml&gt;</code> 同时读取
+<code>pricing</code> 块，按键覆盖 <code>config/k8s_policy.yaml</code>
+的默认牌价；没有 <code>pricing</code>
+时回落到默认，行为与现在相同。</li>
+<li>阈值全部进 <code>config/k8s_policy.yaml</code>；契约的 B
+增加趋势子项（见 specs 增量）。</li>
+</ol>
+<h3 id="趋势守卫是否也用于-cpu只用于内存配置可开">趋势守卫是否也用于
+cpu：只用于内存，配置可开</h3>
+<p>选择：默认 <code>trend_resources: [memory]</code>。理由：</p>
+<ul>
+<li>内存不可压缩。泄漏或持续增长的后果是 OOMKilled
+与重启，且推荐值（窗口峰值 × 1.2）一周内可被追上。CPU 可压缩，超出
+request 时先表现为 throttling，而 B 已有「高峰期 throttling
+比例」守卫，能在后果发生的第一时间抓到，代价是延迟而不是进程被杀。</li>
+<li>CPU 的每日最大值受流量周期（工作日 / 周末、周一峰值）支配，14
+天窗口刚好两个周期，窗口起点相位不同就会拟合出虚假斜率。误报的代价是放弃一次合法降配，在
+cpu 上这个误报面比内存大得多。</li>
+<li>真实的 CPU
+持续增长（业务增长）对容量规划重要，但它的正确处理是规划口径（预测需求），不是降配前的安全门；本
+change 不扩展到那里。</li>
+<li>代码对资源没有硬编码：把 <code>cpu</code> 加进
+<code>trend_resources</code>
+即启用同一逻辑，单测覆盖了开启与关闭两种配置。</li>
+</ul>
+<h3 id="不修route-quotecpu">不修：route-quote/cpu</h3>
+<p>§8.4 把它归因为「契约规则（p99 × 1.3）与
+<code>expect</code>（按尖峰定容）的分歧」，不是实现错误。要不要让推荐值或
+B 看 p99.9 /
+窗口最大值，会改变基础世界里已验证的推荐值，属于契约问题，留给维护者决定，本
+change 不动。session-store/memory 的推荐值（2.9375）也不改：趋势守卫让它
+DENY，但推荐公式本身未动，所以 <code>request_in_range</code>
+对这一条仍可能不命中，如实记录。</p>
+<h3 id="盲测与污染">盲测与污染</h3>
+<ul>
+<li>不读、不运行
+<code>testenv/heldout/k8s_fresh2_*</code>、<code>testenv/test_k8s_fresh2.py</code>
+及 c0036 的任何产物。修复只依据 §8 分析与 SRE 判断。</li>
+<li>第一个预注册世界（<code>k8s_fresh_world.yaml</code>）在修复后重跑，结果记入
+<code>eval/EXPERIMENTS.md</code>
+§8.5，并标注「已污染，不能当成泛化证据」。</li>
+</ul>
+<h3 id="人工-gate-与回滚">人工 gate 与回滚</h3>
+<p>纯本地、只读：不触 AWS、不触集群。回滚：revert 本 change 的
+commit；盒带只新增（旧盒带 git mv 到
+<code>eval/cassettes/archive/</code>），可复原。</p>
+<h3 id="capabilities">Capabilities</h3>
+<h4 id="modified-capabilities">Modified Capabilities</h4>
+<ul>
+<li><code>k8s-mainline</code>（c0027）：条件 B
+增加趋势子项；取数按容器过滤。</li>
+<li><code>k8s-pipeline</code>（c0031）：<code>--nodes-from</code>
+同时读取 <code>pricing</code>。</li>
+</ul>
+<h2 id="验收证据">验收证据</h2>
+<p>所有输出为原样，本机路径前缀已去掉。第一个预注册世界已被这次修复污染，§8.5
+的数字只证明修复生效。</p>
+<h3 id="修了什么怎么证明">修了什么、怎么证明</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>项</th>
+<th>代码</th>
+<th>单测</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>趋势守卫（B 子项，仅内存）</td>
+<td><code>finops_agent/k8s/collect.py</code>（<code>daily_trend</code>）、<code>policy.py</code>（<code>cond_b</code>）、<code>config/k8s_policy.yaml</code></td>
+<td><code>test_policy.TrendGuardTest</code>（上升 FAIL、平稳
+PASS、下降无
+FAIL、请求已覆盖外推、未触发的高外推被忽略）；<code>test_collect.TrendCollectTest</code>（含
+cpu 默认关闭、可开启、噪声序列、点数不足）</td>
+</tr>
+<tr>
+<td>按容器过滤</td>
+<td><code>collect.py</code>（<code>resource_measures</code>）</td>
+<td><code>test_collect.ContainerFilterTest</code>（sidecar 夹具：sidecar
+把未指名容器的查询放大 10 倍，决策里的 usage / request / limit
+不变；所有相关查询都带 <code>container="app"</code>；无
+<code>container</code> 标签时选择器不变）</td>
+</tr>
+<tr>
+<td>定价通道</td>
+<td><code>pipeline.py</code>（<code>pricing_from</code>）</td>
+<td><code>test_pipeline</code>：世界有 <code>pricing</code>
+覆盖、缺省回落、世界定价翻倍时 <code>realizable_usd_month</code>
+精确翻倍</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="基础世界verdict推荐值节省金额条件状态与理由逐条不变">基础世界：verdict、推荐值、节省金额、条件状态与理由逐条不变</h3>
+<p>模板叙述下，修复前（c0037
+前一个提交的代码）与修复后各跑一次基础世界，比较每条决策的
+verdict、推荐值、savings、usage、条件状态、reasons：</p>
+<pre><code>old == new: True (18 decisions)</code></pre>
+<p>所以 <code>eval/k8s_baseline.json</code>
+没改（基础世界没有数字变化）。变化的只有证据列表里的选择器（多了
+<code>container=</code>），因此叙述提示词变了，盒带重录。</p>
+<pre><code>$ make k8s-eval
+{&quot;verdict_accuracy&quot;: 1.0, &quot;unsafe_allow&quot;: 0, &quot;unknown_recall&quot;: 1.0, &quot;request_in_range&quot;: 1.0, &quot;realizable_accuracy&quot;: 1.0}
+n={&#39;expected&#39;: 18, &#39;decisions&#39;: 18, &#39;unknown_expected&#39;: 2, &#39;ranged&#39;: 8, &#39;realizable&#39;: 2} narrative={&#39;llm&#39;: 18}
+gates: pass</code></pre>
+<h3 id="其他验收命令">其他验收命令</h3>
+<pre><code>$ make k8s-days
+== k8s-day1 (day 1, base world, as_of 2026-10-25T00:00:00Z) ==
+   new=10  unchanged=0  expired=0   plans=10  verdicts={&#39;ALLOW&#39;: 7, &#39;DENY&#39;: 4, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}
+== k8s-day2 (day 2, base world, one day later, as_of 2026-10-26T00:00:00Z) ==
+   new=0  unchanged=8  expired=2   plans=8  verdicts={&#39;ALLOW&#39;: 5, &#39;DENY&#39;: 6, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}
+== k8s-day3 (day 3, drift_day3: api-steady load +60%, as_of 2026-10-28T00:00:00Z) ==
+   new=1  unchanged=7  expired=1   plans=8  verdicts={&#39;ALLOW&#39;: 5, &#39;DENY&#39;: 6, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}
+== api-steady/cpu: ledger history ==
+$ make k8s-verify
+k8s verify [control] after_clean.yaml: predicted 140.16 realized 140.16 bill delta -140.16 closure diff -2.84e-14
+runs/k8s-verify/k8s_verify.json
+wrote runs/k8s-verify/k8s_verify.json and docs/K8S_SAVINGS_VERIFICATION.md
+$ make eval   # appendix
+{&quot;recall&quot;: 1.0, &quot;savings_recall&quot;: 1.0, &quot;precision&quot;: 1.0, &quot;savings_accuracy&quot;: 0.9167, &quot;step_agreement&quot;: 1.0, &quot;depth&quot;: {&quot;shallow_recall&quot;: 1.0, &quot;deep_recall&quot;: 1.0}, &quot;leads&quot;: 7}
+missed: 
+gates: pass
+$ python3 tools/check_rules.py --docs
+check_rules: OK
+$ bash eval/k8s_heldout.sh   # replay
+GATE FAILED: request_in_range 0.9231 is worse than baseline 1.0
+{&quot;verdict_accuracy&quot;: 1.0, &quot;unsafe_allow&quot;: 0, &quot;unknown_recall&quot;: 1.0, &quot;request_in_range&quot;: 0.9231, &quot;realizable_accuracy&quot;: 1.0}
+n={&#39;expected&#39;: 20, &#39;decisions&#39;: 20, &#39;unknown_expected&#39;: 2, &#39;ranged&#39;: 13, &#39;realizable&#39;: 3} narrative={&#39;llm&#39;: 20}</code></pre>
+<p>单测：<code>python3 -W ignore -m unittest discover -t . -s finops_agent -p 'test_*.py'</code>
+通过（356 个）；<code>-s eval</code> 通过（44 个）；<code>testenv</code>
+下除被盲测的 <code>test_k8s_fresh2.py</code>
+之外的全部文件通过（该文件没有运行，见下）。<code>make test</code> 里
+<code>tools/</code> 一段只有
+<code>test_build_index.test_index_lists_every_change</code>
+失败：<code>reports/index.html</code> 没有本 change 的行；本地
+<code>python3 tools/build_index.py</code>
+后通过，该文件不提交（按约定由维护者整合时生成）。</p>
+<h3 id="盒带">盒带</h3>
+<ul>
+<li>基础世界、<code>k8s-days</code>、第一个预注册世界：真实
+<code>claude -p</code> 重录（<code>FINOPS_LLM_MODE=record</code>），共
+88 个新盒带；叙述全部来自 LLM，<code>narrative_ungrounded</code> 为
+0。</li>
+<li>旧盒带 88 个 <code>git mv</code> 到
+<code>eval/cassettes/archive/</code>，<code>MANIFEST.md</code>
+列出每个文件上一次被哪个命令引用。没有删除任何文件。</li>
+<li>过程中有两轮被废弃的重录（第一轮：生成的夹具里一个 12
+位十六进制短键恰好全是数字，被泄漏扫描当成账号号；改选择器顺序后整批重录。第二轮：趋势证据改为只在触发时出现），它们的盒带原样放在
+<code>archive/intermediate/</code> 与
+<code>archive/intermediate_r2/</code>，<code>MANIFEST.md</code>
+有说明。</li>
+</ul>
+<h3
+id="第一个预注册世界修复前后已污染">第一个预注册世界：修复前后（已污染）</h3>
+<p><code>bash eval/k8s_heldout.sh</code>（原始输出
+<code>eval_record_output.txt</code>、<code>k8s_fresh_decisions.json</code>、<code>k8s_fresh_eval.json</code>）。</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>修复前（c0035）</th>
+<th>修复后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>verdict_accuracy</td>
+<td>0.90（18/20）</td>
+<td>1.0（20/20）</td>
+</tr>
+<tr>
+<td>unsafe_allow</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr>
+<td>unknown_recall</td>
+<td>1.0</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>request_in_range</td>
+<td>0.7692（10/13）</td>
+<td>0.9231（12/13）</td>
+</tr>
+<tr>
+<td>realizable_accuracy</td>
+<td>0.6667（2/3）</td>
+<td>1.0（3/3）</td>
+</tr>
+</tbody>
+</table>
+<p>session-store/memory 的 B：</p>
+<pre><code>使用量持续爬升：每日峰值的最小二乘斜率 0.076798 GiB/天（R² 0.999978），按此外推 14 天后峰值约 3.48859 GiB，推荐 2.9375 GiB 低于 3.48859 × (1+0.1)，先查泄漏或增长</code></pre>
+<p>逐条前后对比与诚实的限制见 <code>eval/EXPERIMENTS.md</code>
+§8.5。route-quote/cpu 没有修（契约 p99 × 1.3 与 <code>expect</code>
+的分歧，留给维护者）：它仍是唯一的区间外项。</p>
+<h3 id="盲测">盲测</h3>
+<p>没有读取、打开或运行
+<code>testenv/heldout/k8s_fresh2_*</code>、<code>testenv/test_k8s_fresh2.py</code>、c0036
+的任何产物、<code>notes/blog/0036-*</code>、<code>reports/0036-*</code>。<code>testenv</code>
+的测试逐文件运行并跳过
+<code>test_k8s_fresh2.py</code>；<code>make test</code> 的 testenv
+一段（<code>discover -s testenv</code>）会包含该文件，本次没有用它。</p>
+<h3 id="没做的">没做的</h3>
+<ul>
+<li>route-quote/cpu（契约问题）。</li>
+<li>趋势证据的人话标签：<code>finops_agent/k8s/report.py</code> 不在本
+change
+范围。趋势触发的决策，报告证据表里这两行显示「（未标注）」；基础世界与样例报告不受影响（趋势没有触发，没有证据行）。</li>
+<li>趋势守卫对 cpu 默认关闭；阈值在两个世界上没有测过灰色地带。</li>
+</ul>
+</body>
+</html>

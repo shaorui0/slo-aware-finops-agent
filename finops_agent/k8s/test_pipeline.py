@@ -42,6 +42,38 @@ class PipelineTest(unittest.TestCase):
             main(argv)
         return Path(tmp) / run_id
 
+    def test_nodes_from_pricing_overrides_default_and_falls_back(self):
+        from types import SimpleNamespace
+        from finops_agent.k8s.pipeline import pricing_from
+        from finops_agent.k8s.policy import load_policy
+        pol = load_policy()
+        with tempfile.TemporaryDirectory() as t:
+            w = Path(t) / "w.yaml"
+            w.write_text(yaml.safe_dump({"nodes": {"min": 2, "max": 9}, "pricing": {"node_hour_usd": 0.384}}))
+            got = pricing_from(SimpleNamespace(nodes_from=str(w)), pol)
+            self.assertEqual(got["node_hour_usd"], 0.384)
+            self.assertEqual(got["node_type"], pol["pricing"]["node_type"])      # keys the world does not set keep the default
+            w.write_text(yaml.safe_dump({"nodes": {"min": 2, "max": 9}}))
+            self.assertEqual(pricing_from(SimpleNamespace(nodes_from=str(w)), pol), pol["pricing"])
+            self.assertEqual(pricing_from(SimpleNamespace(nodes_from=None), pol), pol["pricing"])
+
+    def test_world_pricing_reaches_the_savings(self):
+        with tempfile.TemporaryDirectory() as t:
+            w = Path(t) / "w.yaml"
+            doc = dict(self.world)
+            doc["pricing"] = {**self.world["pricing"], "node_hour_usd": self.world["pricing"]["node_hour_usd"] * 2}
+            w.write_text(yaml.safe_dump(doc))
+            base = json.loads((self.go(Path(t) / "a") / "k8s_decisions.json").read_text())["decisions"]
+            argv = ["k8s", "run", "--prom", self.url, "--slos", str(SLOS), "--nodes-from", str(w), "--out", str(Path(t) / "b"),
+                    "--state", str(Path(t) / "b" / "s.json"), "--run-id", "t", "--narrate", "template"]
+            with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
+                main(argv)
+            dbl = json.loads((Path(t) / "b" / "t" / "k8s_decisions.json").read_text())["decisions"]
+        pairs = [(a["savings"]["realizable_usd_month"], b["savings"]["realizable_usd_month"]) for a, b in zip(base, dbl)]
+        self.assertTrue(any(a > 0 for a, _ in pairs))
+        for a, b in pairs:
+            self.assertAlmostEqual(b, 2 * a, places=4)
+
     def test_full_run_matches_every_expectation(self):
         with tempfile.TemporaryDirectory() as t:
             out = self.go(t)

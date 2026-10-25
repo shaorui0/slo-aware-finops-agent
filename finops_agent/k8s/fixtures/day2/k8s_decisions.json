@@ -92,14 +92,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"data\",workload=\"batch-nightly\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"job\",namespace=\"data\",workload=\"batch-nightly\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"data\",workload=\"batch-nightly\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"job\",namespace=\"data\",workload=\"batch-nightly\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -113,49 +113,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 0.01003,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 0.99331,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 1.02426,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 1.03,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
           "window": "14d@1h",
           "value": [
             2,
@@ -166,7 +166,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"data\",workload=\"batch-nightly\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"data\",workload=\"batch-nightly\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001434,
           "source": "prometheus"
@@ -259,31 +259,29 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "batch-nightly 当前 CPU request 为 2.0 core,limit 为 2.0 core,replicas 为 1;14 天观测 p50 为 0.01003,p95 为 0.99331,p99 为 1.02426,max 为 1.03。",
-          "evidence": "条件 A、B、D 均为 PASS:有效天数 14,覆盖率 1.0(E8、E9、E6),高峰期 throttling 为 0.001434,集群无 Pending(E11、E18),回滚容量也足够(E20、E22)。但条件 C 为 FAIL:批任务最长耗时 6922.3s,而 deadline 为 7200s(E16、E17),此时 burn_rate_1h 为 0.2592,剩余预算为 0.81(E14、E15)。",
-          "conclusion": "最终结论为 DENY,由条件 C 驱动:批任务最长耗时 6922.3s 超过 0.8 × deadline 7200s,SLO 不允许此时变更,因此冻结优化。"
+          "status": "batch-nightly 的 CPU request 为 2.0 core,limit 为 2.0 core,副本数 1。过去 14 天 p99 使用量为 1.02426,最大值 1.03,p50 为 0.01003。",
+          "evidence": "推荐 request 为 1.35,条件 A、B、D 均通过:有效天数 14,覆盖率 1.0(E6、E8、E9),高峰期 throttling 为 0.001434(E11),无 Pending(E18)。但批任务最长耗时 6922.3s,而 deadline 为 7200s(E16、E17),SLO 燃烧率为 0.2592(E14)。",
+          "conclusion": "最终裁决为 DENY,由条件 C 驱动:批任务最长耗时 6922.3s 已超过 0.8 × deadline 7200s,服务正在退化,冻结优化。另外 realizable_usd_month 为 0.0,节点数 6 缩容后仍为 6,实际无法回收资金。"
         },
         "would_change": [
-          "批任务最长耗时降到 deadline 7200s 的 0.8 倍以内,条件 C 才可能通过",
-          "后续观测到批任务耗时稳定回落、服务不再处于退化状态"
+          "批任务最长耗时降到 0.8 × deadline 7200s 以内,条件 C 才可能通过",
+          "deadline 放宽或 SLO 目标重新定义,使当前最长耗时留有余量",
+          "缩容后节点数能从 6 减少,使 realizable_usd_month 大于 0.0"
         ],
         "proposal": null,
         "evidence": [
           "E6",
+          "E8",
+          "E9",
           "E11",
           "E14",
-          "E15",
           "E16",
           "E17",
-          "E18",
-          "E20",
-          "E22",
-          "E8",
-          "E9"
+          "E18"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "f55db33ba0ea"
+        "cassette": "652dae0b3a8d"
       },
       "container": "job",
       "slo": {
@@ -386,14 +384,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"data\",workload=\"batch-nightly\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"job\",namespace=\"data\",workload=\"batch-nightly\",resource=\"memory\"})",
           "window": "instant",
           "value": 4.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"data\",workload=\"batch-nightly\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"job\",namespace=\"data\",workload=\"batch-nightly\",resource=\"memory\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
@@ -407,49 +405,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 0.300471,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 1.19508,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 1.217667,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[14d]))",
           "window": "14d",
           "value": 1.223905,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"job\",namespace=\"data\",workload=\"batch-nightly\"}[1h]))",
           "window": "14d@1h",
           "value": [
             2,
@@ -546,24 +544,18 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "batch-nightly 当前内存 request 为 4.0 GiB,limit 为 6.0 GiB,replicas 为 1。过去 14 天观测到的内存 p95 为 1.19508,max 为 1.223905(E1、E2、E3、E5、E7)。",
-          "evidence": "14 天内存数据有效,覆盖率为 1.0,没有 OOMKilled 事件,推荐 request 为 1.5 GiB(E7、E11、E8、E9)。但批任务最长耗时为 6922.3s,已超过 deadline 7200s 对应的阈值,SLO 条件 C 未通过(E15、E16)。",
-          "conclusion": "最终结论为 DENY。条件 A、B、D 均 PASS,由条件 C 失败驱动:批任务最长耗时 6922.3s > 0.8 × deadline 7200s。此外 reasons 显示服务正在退化,优化被冻结(E13、E14、E15、E16)。"
+          "status": "workload data/batch-nightly 的内存 request 为 4.0 GiB,limit 为 6.0 GiB,副本数 1。过去 14 天观测到的内存使用 p95 为 1.19508,最大值为 1.223905,峰值时段为 UTC 2、3、4 点。",
+          "evidence": "历史数据充足(有效天数 14,覆盖率 1.0)且无 OOM 事件(oom_events 0.0),推荐 request 为 1.5 GiB(E7、E11)。但批任务最长耗时为 6922.3,而 deadline 为 7200.0(E15、E16),1 小时 burn rate 为 0.2592,剩余预算为 0.81(E13、E14)。",
+          "conclusion": "最终结论为 DENY,由条件 C 驱动:批任务最长耗时 6922.3 已超过 0.8 × deadline 7200.0 的阈值,SLO 不允许此时变更。条件 A、B、D 均通过,但不改变结论。"
         },
         "would_change": [
-          "批任务最长耗时降到 0.8 × deadline 7200s 以内,使条件 C 通过",
-          "服务退化状态解除,冻结取消",
-          "SLO 的 deadline 调整或批任务耗时有持续改善的新数据"
+          "批任务最长耗时降至 0.8 × deadline 7200.0 的阈值以下(当前 6922.3)",
+          "服务不再处于退化状态,优化冻结解除",
+          "deadline 被重新定义或放宽,使条件 C 通过"
         ],
         "proposal": null,
         "evidence": [
-          "E1",
-          "E2",
-          "E3",
-          "E5",
           "E7",
-          "E8",
-          "E9",
           "E11",
           "E13",
           "E14",
@@ -572,7 +564,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "5cbbf531da62"
+        "cassette": "d37fbc535c67"
       },
       "container": "job",
       "slo": {
@@ -696,14 +688,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"api-steady\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"api-steady\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"api-steady\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"api-steady\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -717,49 +709,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.15327,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.16401,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.16494,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.16524,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-steady\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -791,7 +783,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"api-steady\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"api-steady\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001272,
           "source": "prometheus"
@@ -898,40 +890,38 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "api-steady 的 CPU request 为 1.0 core,limit 为 2.0 core,副本数 3,过去 14 天观测到的 p99 使用量仅 0.16494 core,max 为 0.16524 core。",
-          "evidence": "14 天内 p50 为 0.15327、p95 为 0.16401、p99 为 0.16494、max 为 0.16524(E4、E5、E6、E7),高峰期 throttling 为 0.001272,OOM 事件为 0.0(E11、E12)。SLO 燃烧率 0.3053,剩余预算 0.8062(E14、E15),集群 Pending 为 0.0(E20)。",
-          "conclusion": "判定为 ALLOW,条件 A–D 全部 PASS,且没有 HPA 联动。其中条件 B 的依据是推荐值 0.25 ≥ p99 加余量,高峰期 throttling 0.001272 低于 0.05;条件 D 的依据是缩容后空闲 21.25 core ≥ 回滚所需 2.25 core。"
+          "status": "shop/api-steady 的 CPU request 为 1.0 core,limit 为 2.0 core,副本数 3。过去 14 天观测到 p50 为 0.15327,p95 为 0.16401,p99 为 0.16494,max 为 0.16524。",
+          "evidence": "[已移除：含未取自证据的数字]高峰期 throttling 为 0.001272(E11),OOM 事件为 0.0(E12),集群 Pending 数为 0.0(E20),有效天数 14、覆盖率 1.0(E8、E9)。",
+          "conclusion": "判定为 ALLOW,条件 A、B、C、D 全部通过。其中 B 以推荐值 0.25 相对 p99 0.16494 有足够余量、throttling 0.001272 低于 0.05 为主要依据;C 的燃烧率为 0.3053、剩余预算为 0.8062。"
         },
         "would_change": [
-          "若有效历史天数不足 14 或样本覆盖率低于 0.90,条件 A 将不再通过,判定会改变",
-          "若 SLO 燃烧率超过 1 或剩余预算低于 0.25,条件 C 将不再通过,判定会改变",
-          "若高峰期 throttling 升至 0.05 以上或集群出现 Pending,条件 B 将不再通过,判定会改变"
+          "若有效历史天数少于 14 天或样本覆盖率低于 0.90,条件 A 将不通过,判定会改变",
+          "若 1 小时燃烧率高于 1 或剩余预算低于 0.25,条件 C 将不通过,判定会改变",
+          "若缩容后集群空闲 CPU 不足以支撑回滚,或缺少变更前快照与回滚命令,条件 D 将不通过,判定会改变"
         ],
-        "proposal": "将 shop/api-steady 的 CPU request 从 1.0 core 调整为 0.25 core,影响 3 个副本。request_value_usd_month(账面释放的预留价值)为 51.903,realizable_usd_month(节点实际移除后真正节省的费用)为 140.16,节点数由 6 降至 5。",
+        "proposal": "将 shop/api-steady 的 CPU request 从 1.0 core 调整为 0.25 core,影响 3 个副本。按 request 价值计算可释放 51.903 美元/月(request_value_usd_month,账面上释放的预留价值),节点从 6 个减到 5 个后实际可节省 140.16 美元/月(realizable_usd_month)。",
         "evidence": [
-          "E4",
-          "E5",
+          "E1",
+          "E3",
           "E6",
           "E7",
+          "E8",
+          "E9",
+          "E10",
           "E11",
           "E12",
           "E14",
           "E15",
-          "E20",
-          "E8",
-          "E9",
-          "E1",
-          "E3",
-          "E22",
-          "E23",
-          "E21",
-          "E24",
           "E18",
-          "E19"
+          "E19",
+          "E20",
+          "E21",
+          "E22",
+          "E24"
         ],
-        "redactions": 0,
+        "redactions": 1,
         "model": "sonnet",
-        "cassette": "8d731880085c"
+        "cassette": "9122d31f6a0c"
       },
       "container": "app",
       "slo": {
@@ -1059,14 +1049,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"api-steady\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"api-steady\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"api-steady\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"api-steady\",resource=\"memory\"})",
           "window": "instant",
           "value": 3.0,
           "source": "prometheus"
@@ -1080,49 +1070,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.900169,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.932735,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.935431,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[14d]))",
           "window": "14d",
           "value": 0.935998,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-steady\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-steady\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -1254,34 +1244,33 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "api-steady 的内存 request 为 2.0 GiB,limit 为 3.0 GiB,副本数 3;近 14 天观测到的 p50 为 0.900169,p95 为 0.932735,p99 为 0.935431,max 为 0.935998(单位 GiB)。",
-          "evidence": "14 天内最大工作集为 0.935998,OOMKilled 次数为 0.0,历史有效天数 14、覆盖率 1.0(E7、E11、E8、E9)。SLO 燃烧率 0.3053,剩余预算 0.8062;缩容后空闲 91.62 GiB,回滚所需 2.62 GiB(E13、E14、E22、E23)。",
-          "conclusion": "判定为 ALLOW,条件 A、B、C、D 全部 PASS,且没有 HPA 联动。其中条件 B 给出推荐 request 1.125 GiB(max_working_set*(1+0.2) ceil 64Mi),高于峰值 0.935998,没有 OOM,可以安全下调。"
+          "status": "shop 命名空间的 api-steady 工作负载,memory request 为 2.0 GiB,limit 为 3.0 GiB,副本数 3。14 天内观测到的 p50 为 0.900169,p95 为 0.932735,p99 为 0.935431,最大值为 0.935998。",
+          "evidence": "14 天窗口内最大工作集为 0.935998,且 OOMKilled 事件为 0.0(E7、E11)。推荐 request 为 1.125 GiB,依据是最大工作集加 0.2 的余量。燃烧率 0.3053,剩余预算 0.8062(E13、E14),集群 Pending 数为 0.0(E19)。",
+          "conclusion": "结论为 ALLOW,条件 A、B、C、D 全部通过且没有 HPA 联动。其中条件 B 的数据最关键:推荐值高于峰值加余量,无 OOMKilled,峰值低于 limit 的 0.9 倍(E7、E11、E2)。"
         },
         "would_change": [
-          "如果有效历史天数低于 14 或样本覆盖率低于 0.90,条件 A 将不再通过,判定会改变",
-          "如果 SLO 燃烧率升到高于 1,或剩余预算低于 0.25,条件 C 将失败,判定会改变",
-          "如果出现 OOMKilled 事件,或峰值接近 limit 的 0.9 倍,条件 B 将失败,判定会改变"
+          "若有效历史天数低于 14 或样本覆盖率低于 0.90,条件 A 将不再通过",
+          "若出现 OOMKilled 事件或峰值接近 limit,条件 B 将失败",
+          "若燃烧率超过 1 或剩余预算低于 0.25,条件 C 将失败"
         ],
-        "proposal": "将 shop/api-steady 的内存 request 从 2.0 GiB 调整为 1.125 GiB,影响 3 个副本。request_value_usd_month(账面释放的预留价值)为 7.856625,realizable_usd_month(节点实际移除后真正节省的金额)为 0.0,因为节点数在调整前后均为 6。",
+        "proposal": "将 api-steady 的 memory request 从 2.0 GiB 调整为 1.125 GiB,影响 3 个副本。request_value_usd_month(账面释放的预留价值)为 7.856625,realizable_usd_month(节点移除后实际节省)为 0.0,因为节点数仍为 6(前后均为 6)。",
         "evidence": [
           "E1",
           "E2",
           "E3",
           "E7",
-          "E8",
-          "E9",
           "E11",
           "E13",
           "E14",
           "E19",
+          "E20",
+          "E21",
           "E22",
-          "E23",
-          "E12"
+          "E23"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "b9918a211f34"
+        "cassette": "c0049a7d43d3"
       },
       "container": "app",
       "slo": {
@@ -1386,14 +1375,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"api-tidal\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"api-tidal\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"api-tidal\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"api-tidal\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -1407,49 +1396,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 0.12473,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 1.14809,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 1.24296,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 1.88384,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
           "window": "14d@1h",
           "value": [
             14
@@ -1458,7 +1447,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"api-tidal\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"api-tidal\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h])))",
           "window": "14d@1h",
           "value": 0.162039,
           "source": "prometheus"
@@ -1565,30 +1554,28 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "api-tidal 的 CPU request 为 2.0 core,limit 为 2.0 core,副本数 2。14 天观测使用量 p50 为 0.12473,p95 为 1.14809,p99 为 1.24296,max 为 1.88384。",
-          "evidence": "高峰时段(UTC 14 点)的 throttling 比例为 0.162039,已高于阈值 0.05(E11、E6)。有效天数 14,覆盖率 1.0,条件 A 通过(E8、E9);SLO 燃烧率 0.2807,剩余预算 0.8089,条件 C 通过(E14、E15);缩容后空闲容量足够回滚,条件 D 通过(E22、E24、E21)。",
-          "conclusion": "结论为 DENY,由条件 B 驱动:高峰期 throttling 比例 0.162 ≥ 0.05,在当前 2.0 core 的 limit 下已出现明显限流,不具备继续降配的余量。建议 request 1.65 的方案不予采纳。"
+          "status": "api-tidal 的 CPU request 为 2.0 core,limit 为 2.0 core,副本数 2。过去 14 天观测到 p50 为 0.12473,p95 为 1.14809,p99 为 1.24296,max 为 1.88384。",
+          "evidence": "高峰期(UTC 14 时)throttling 比例为 0.162039,超过阈值 0.05(E11),而当前 request 已是 2.0 core,说明峰值时已有 CPU 受限(E1、E6、E7)。历史数据充足(14 天,覆盖率 1.00),SLO 燃烧率 0.2807、剩余预算 0.8089 也满足要求(E14、E15),无 OOM 事件(E12)。",
+          "conclusion": "裁决为 DENY,由条件 B 不通过驱动:高峰期 throttling 比例 0.162 ≥ 0.05,没有为峰值留出足够余量。条件 A、C、D 均通过,但不能抵消条件 B 的失败。"
         },
         "would_change": [
-          "高峰期 throttling 比例降到 0.05 以下(例如先排查并缓解 14 点高峰的限流原因)后重新评估条件 B",
-          "提供更多天数、无限流的高峰数据,证明 p99 1.24296 在新 request 下仍有足够余量"
+          "高峰期 throttling 比例降到 0.05 以下,说明当前 request 在峰值时有足够余量",
+          "提供新的观测数据证明峰值 CPU 需求低于建议的 request 1.65,且 throttling 不再偏高"
         ],
         "proposal": null,
         "evidence": [
+          "E1",
           "E6",
+          "E7",
           "E11",
-          "E20",
-          "E8",
-          "E9",
+          "E12",
           "E14",
           "E15",
-          "E22",
-          "E24",
-          "E21"
+          "E20"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "7d115ea54ce2"
+        "cassette": "b77623db8451"
       },
       "container": "app",
       "slo": {
@@ -1709,14 +1696,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"api-tidal\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"api-tidal\",resource=\"memory\"})",
           "window": "instant",
           "value": 6.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"api-tidal\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"api-tidal\",resource=\"memory\"})",
           "window": "instant",
           "value": 8.0,
           "source": "prometheus"
@@ -1730,49 +1717,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 5.100871,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 5.146185,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 5.150013,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[14d]))",
           "window": "14d",
           "value": 5.150999,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"api-tidal\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -1904,22 +1891,19 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "api-tidal 工作负载的内存 request 为 6.0 GiB,limit 为 8.0 GiB,副本数 2。14 天内工作集 p50 为 5.100871,p95 为 5.146185,p99 为 5.150013,最大值为 5.150999(单位 GiB)。",
-          "evidence": "14 天最大工作集为 5.150999(E7),p99 为 5.150013(E6),期间 OOMKilled 事件为 0.0(E11),集群无 Pending Pod(E19)。推荐 request 为 6.1875,不低于当前的 6.0。",
-          "conclusion": "判定为 NOOP:推荐值 6.1875 不低于当前值 6,无需下调 request。条件 A、B、C、D 均为 PASS,没有需要变更的内容,因此节省为 0.0。"
+          "status": "api-tidal 的 memory request 为 6.0 GiB,limit 为 8.0 GiB,副本数 2。14 天内观测到的 p95 为 5.146185,max 为 5.150999,没有 OOM 事件。",
+          "evidence": "推荐 request 为 6.1875,不低于当前的 6.0,所以不需要下调(E1、E7、E11)。条件 A、B、C、D 全部 PASS,其中燃烧率为 0.2807,剩余预算为 0.8089(E13、E14);节点数前后均为 6,节省金额均为 0.0。",
+          "conclusion": "判定为 NOOP,因为推荐值 6.1875 不低于当前值 6.0,无需调整。条件 A、B、C、D 均通过,没有失败或未知的条件。"
         },
         "would_change": [
-          "若观测到的峰值工作集明显下降,使推荐值低于当前的 6.0,则可能出现下调空间",
-          "若连续多天的最大工作集持续低于现有水平,推荐值会随之降低,判定才可能改变"
+          "如果推荐值低于当前 request 6.0,即实际用量明显下降,判定可能改变",
+          "如果 max_working_set 下降,使推荐值低于当前 request,才会出现可缩减的空间"
         ],
         "proposal": null,
         "evidence": [
-          "E4",
-          "E5",
-          "E6",
+          "E1",
+          "E2",
           "E7",
-          "E8",
-          "E9",
           "E11",
           "E13",
           "E14",
@@ -1927,7 +1911,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "7ebd1a3491cb"
+        "cassette": "9231f0189f81"
       },
       "container": "app",
       "slo": {
@@ -2055,14 +2039,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"burning-slo\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"burning-slo\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"burning-slo\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"burning-slo\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -2076,49 +2060,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.10123,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.10827,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.10895,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.10908,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -2150,7 +2134,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"burning-slo\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"burning-slo\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001309,
           "source": "prometheus"
@@ -2257,21 +2241,22 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "当前 CPU request 为 1.0 core,limit 为 2.0 core,副本数 2;14 天观测到的使用量 p50 为 0.10123,p99 为 0.10895,max 为 0.10908。",
-          "evidence": "使用量远低于当前 request,推荐 request 为 0.15,高峰期 throttling 为 0.001309(E1、E3、E6、E11)。但 1h 燃烧率为 2.3861,剩余错误预算为 0.125,服务正在消耗错误预算(E14、E15)。",
-          "conclusion": "最终结论为 DENY,由条件 C 驱动:1h 燃烧率 2.3861 > 1,且剩余错误预算 0.125 < 0.25,因此冻结优化。条件 A、B、D 均为 PASS,但不能抵消 C 的失败。"
+          "status": "cpu 当前 request 为 1.0 core,limit 为 2.0 core,副本数 2。14 天观测使用量 p50 为 0.10123,p95 为 0.10827,p99 为 0.10895,max 为 0.10908。",
+          "evidence": "使用量远低于当前 request,推荐 request 为 0.15,高峰期 throttling 为 0.001309,无 OOM 事件(E1、E6、E7、E11、E12)。但 1h 燃烧率为 2.3861,剩余错误预算为 0.125,服务正在消耗错误预算(E14、E15、E18、E19)。",
+          "conclusion": "最终结论为 DENY,由条件 C 驱动:1h 燃烧率 2.3861 > 1,且剩余错误预算 0.125 < 0.25,服务正在退化,因此冻结优化。条件 A、B、D 均为 PASS,但不改变该结论。"
         },
         "would_change": [
           "1h 燃烧率降到 1 以下,服务不再消耗错误预算",
-          "剩余错误预算回升到 0.25 以上",
-          "SLO 指标恢复稳定后重新评估,条件 C 变为 PASS"
+          "剩余错误预算恢复到 0.25 以上",
+          "SLO 状态恢复稳定后重新评估,条件 C 变为 PASS"
         ],
         "proposal": null,
         "evidence": [
           "E1",
-          "E3",
           "E6",
+          "E7",
           "E11",
+          "E12",
           "E14",
           "E15",
           "E18",
@@ -2279,7 +2264,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "88025e563beb"
+        "cassette": "d6ed1ce57e95"
       },
       "container": "app",
       "slo": {
@@ -2408,14 +2393,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"burning-slo\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"burning-slo\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"burning-slo\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"burning-slo\",resource=\"memory\"})",
           "window": "instant",
           "value": 3.0,
           "source": "prometheus"
@@ -2429,49 +2414,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.600165,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.62156,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.623429,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[14d]))",
           "window": "14d",
           "value": 0.623998,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"burning-slo\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -2603,13 +2588,13 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "workload shop/burning-slo 的内存 request 为 2.0 GiB，limit 为 3.0 GiB，副本数 2。过去 14 天内存 working set 的 p50 为 0.600165，p95 为 0.62156，p99 为 0.623429，max 为 0.623998，OOM 事件为 0.0。",
-          "evidence": "条件 A、B、D 均为 PASS：有效天数 14，覆盖率 1.0（E7、E8、E9），无 OOMKilled（E11），集群无 Pending（E19）。但 1h 燃烧率为 2.3861（E13），剩余错误预算为 0.125（E14），SLO 已定义，可用性目标 0.999，p99 目标 0.3（E17、E18）。",
-          "conclusion": "结论为 DENY，由条件 C 驱动：1h 燃烧率 2.3861 > 1，且剩余错误预算 0.125 < 0.25，服务正在消耗错误预算，因此冻结优化。"
+          "status": "shop/burning-slo 的 memory 当前 request 为 2.0 GiB,limit 为 3.0 GiB,副本数 2。过去 14 天观测到的 p95 为 0.62156,max 为 0.623998,OOM 事件为 0.0。",
+          "evidence": "历史数据充足:有效天数 14,样本覆盖率 1.0,条件 A 通过(E7、E8、E9)。推荐 request 为 0.75,峰值余量和 OOM 检查通过,条件 B 通过(E7、E11、E2、E19);回滚快照与空闲容量满足要求,条件 D 通过(E1、E3、E21、E22、E20、E23)。但 1h 燃烧率为 2.3861,剩余错误预算为 0.125,SLO 目标为 availability 0.999、p99_seconds 0.3(E13、E14、E17、E18)。",
+          "conclusion": "最终结论为 DENY,由条件 C 失败驱动:1h 燃烧率 2.3861 > 1,且剩余错误预算 0.125 < 0.25,服务正在消耗错误预算,因此冻结优化。"
         },
         "would_change": [
-          "1h 燃烧率降到 1 或以下，服务不再消耗错误预算",
-          "剩余错误预算恢复到 0.25 或以上"
+          "1h 燃烧率降到不高于 1,服务不再消耗错误预算",
+          "剩余错误预算恢复到不低于 0.25"
         ],
         "proposal": null,
         "evidence": [
@@ -2621,11 +2606,18 @@
           "E14",
           "E17",
           "E18",
+          "E1",
+          "E3",
+          "E20",
+          "E21",
+          "E22",
+          "E23",
+          "E2",
           "E19"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "be5c636155ce"
+        "cassette": "720967b2835b"
       },
       "container": "app",
       "slo": {
@@ -2752,14 +2744,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"hpa-managed\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"hpa-managed\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -2773,49 +2765,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.30318,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.32463,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.32662,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.32723,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -2847,7 +2839,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"hpa-managed\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h])))",
           "window": "14d@1h",
           "value": 0.00132,
           "source": "prometheus"
@@ -2968,28 +2960,27 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "[已移除：含未取自证据的数字]",
-          "evidence": "14 天 p50 为 0.30318、p95 为 0.32463、p99 为 0.32662(E4、E5、E6),高峰期 throttling 为 0.00132,OOM 事件为 0.0(E11、E12)。HPA 以该资源为扩缩指标,目标值为 70.0,当前副本 2.0,最大副本 6.0(E13、E14、E15)。",
-          "conclusion": "结论为 REQUIRE_APPROVAL:条件 A、B、C、D 均为 PASS,但 HPA 以该资源作为扩缩指标(hpa_coupled),改 request 会改变副本数,因此需要人工确认。"
+          "status": "当前 cpu request 为 1.0 core,limit 为 2.0 core,副本数为 2。过去 14 天观测到的 p50 为 0.30318,p99 为 0.32662,max 为 0.32723。",
+          "evidence": "14 天内 p99 为 0.32662,max 为 0.32723,高峰期 throttling 为 0.00132,OOM 事件为 0.0(E6、E7、E11、E12)。HPA 以该资源为扩缩指标,目标值为 70.0,当前副本 2.0,最大副本 6.0(E13、E14、E15)。条件 A、B、C、D 均为 PASS。",
+          "conclusion": "判定为 REQUIRE_APPROVAL。条件 A 到 D 均通过,但 hpa_coupled 为 true,HPA 以该资源为扩缩指标,修改 request 会改变副本数,因此需要人工确认。"
         },
         "would_change": [
-          "若 HPA 不再以 CPU 作为扩缩指标(改用其他指标),则不再受 HPA 耦合限制,可以直接放行",
-          "若人工确认缩小 request 后 HPA 的副本数变化(最大副本 6.0 以内)可接受,则可批准该变更"
+          "如果 HPA 不再以 cpu 作为扩缩指标,则 request 变更不会影响副本数,无需人工审批",
+          "如果人工确认修改 request 后 HPA 的副本数变化可以接受,则可以放行"
         ],
-        "proposal": "建议将 hpa-managed 的 CPU request 从 1.0 core 调整为 0.45 core,影响副本数 2;request_value_usd_month(账面释放的预留价值)为 25.3748,realizable_usd_month(移除节点后实际节省)为 0.0,节点数前后均为 6。人工需确认:因 HPA 以 CPU 利用率(目标 70.0)扩缩,降低 request 会改变副本数,该变化是否可接受。",
+        "proposal": "建议将 cpu request 从 1.0 core 调整为 0.45 core,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 25.3748,realizable_usd_month(移除节点后实际节省)为 0.0,节点数前后均为 6。人工需确认:HPA 以 cpu 为扩缩指标,降低 request 会改变利用率计算和副本数,需确认该变化可以接受。",
         "evidence": [
-          "E4",
-          "E5",
           "E6",
+          "E7",
           "E11",
           "E12",
           "E13",
           "E14",
           "E15"
         ],
-        "redactions": 1,
+        "redactions": 0,
         "model": "sonnet",
-        "cassette": "22d5e7eb5ddf"
+        "cassette": "8298a89d8e5a"
       },
       "container": "app",
       "slo": {
@@ -3117,14 +3108,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"hpa-managed\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"hpa-managed\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\",resource=\"memory\"})",
           "window": "instant",
           "value": 3.0,
           "source": "prometheus"
@@ -3138,49 +3129,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.899901,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.932686,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.935347,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[14d]))",
           "window": "14d",
           "value": 0.93599,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"hpa-managed\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -3326,31 +3317,34 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "shop 命名空间下 hpa-managed 的内存 request 为 2.0 GiB,limit 为 3.0 GiB,当前副本数 2。过去 14 天观测到的内存工作集 p50 为 0.899901,p95 为 0.932686,p99 为 0.935347,最大值为 0.93599。",
-          "evidence": "14 天内有效天数为 14,样本覆盖率为 1.0,且 OOM 事件为 0.0(E7、E8、E9、E11)。推荐 request 为 1.125 GiB,高于峰值 0.93599 加余量的要求;集群 Pending Pod 为 0.0(E21)。SLO 燃烧率为 0.3312,剩余预算为 0.8123(E15、E16),节点最小可分配内存为 14.5(E24)。",
-          "conclusion": "结论为 ALLOW,条件 A、B、C、D 全部通过,且没有 HPA 联动。其中条件 B 的关键数据是推荐值 1.125 对应峰值 0.93599,且 OOM 事件为 0.0;条件 C 的燃烧率 0.3312 也处于允许范围内。"
+          "status": "shop 命名空间下的 hpa-managed 工作负载,memory request 为 2.0 GiB,limit 为 3.0 GiB,当前 2 个副本。过去 14 天内存工作集 p50 为 0.899901,p95 为 0.932686,p99 为 0.935347,最大值为 0.93599(单位 GiB)。",
+          "evidence": "14 天内最大工作集为 0.93599(E7),p95 为 0.932686(E5),OOMKilled 事件为 0.0(E11),集群 Pending Pod 为 0.0(E21)。SLO 燃烧率为 0.3312(E15),剩余错误预算为 0.8123(E16)。",
+          "conclusion": "判定为 ALLOW,条件 A、B、C、D 全部通过,且没有 HPA 联动。其中 A 的有效天数 14、覆盖率 1.00,B 的推荐值高于峰值余量要求,C 的燃烧率 0.3312 且剩余预算 0.8123,D 的缩容后空闲 90.75 GiB 大于回滚所需 1.75 GiB,均满足策略要求。"
         },
         "would_change": [
-          "若有效历史天数低于 14 或样本覆盖率低于 0.90,条件 A 将不再通过",
-          "若燃烧率升高或剩余预算降低到阈值以下,条件 C 将不再通过",
-          "若出现 OOMKilled 事件或集群出现 Pending Pod,条件 B 将不再通过"
+          "如果有效历史天数少于 14 天或样本覆盖率低于 0.90,条件 A 将不再通过,判定会改变",
+          "如果出现 OOMKilled 事件,或峰值接近 limit,条件 B 将失败,判定会改变",
+          "如果 SLO 燃烧率升高到超过 1,或剩余错误预算低于 0.25,条件 C 将失败,判定会改变"
         ],
-        "proposal": "将 shop/hpa-managed 的内存 request 从 2.0 GiB 调整为 1.125 GiB,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 5.23775,realizable_usd_month(移除节点后实际节省)为 0.0,因为节点数在调整前后均为 6。",
+        "proposal": "将 shop/hpa-managed 的 memory request 从 2.0 GiB 调整为 1.125 GiB,影响 2 个副本。按账面计算释放的预留价值 request_value_usd_month 为 5.23775,实际可节省的 realizable_usd_month 为 0.0,因为节点数从 6 保持为 6,没有节点可被移除。",
         "evidence": [
           "E1",
+          "E2",
           "E3",
+          "E5",
           "E7",
-          "E8",
-          "E9",
           "E11",
           "E15",
           "E16",
           "E21",
-          "E24"
+          "E22",
+          "E23",
+          "E24",
+          "E25"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "8882f9c9a468"
+        "cassette": "d1a06f267916"
       },
       "container": "app",
       "slo": {
@@ -3477,14 +3471,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"mem-near-oom\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\",resource=\"cpu\"})",
           "window": "instant",
           "value": 0.5,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"mem-near-oom\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
@@ -3498,49 +3492,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 0.04033,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 0.04402,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 0.04435,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 0.04444,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -3572,7 +3566,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"mem-near-oom\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001339,
           "source": "prometheus"
@@ -3679,16 +3673,16 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "当前 CPU request 为 0.5 core,limit 为 1.0 core,副本数 2。观测到的使用量很低:p99 为 0.04435,max 为 0.04444。",
-          "evidence": "14 天的使用量数据显示 p50 为 0.04033,p95 为 0.04402,p99 为 0.04435(E4、E5、E6),max 为 0.04444(E7)。高峰期 throttling 为 0.001339(E11),集群没有 Pending 的 Pod(E20),燃烧率为 0.2982,剩余预算为 0.816(E14、E15)。",
-          "conclusion": "裁决为 ALLOW,条件 A、B、C、D 全部通过,且没有 HPA 联动。其中条件 B 说明推荐值 0.1 满足 p99 的余量要求,条件 D 说明缩容后空闲 19.80 core,大于回滚所需的 0.80 core。"
+          "status": "当前 CPU request 为 0.5 core,limit 为 1.0 core,副本数 2。观测到的 p99 使用量为 0.04435 core,最大值为 0.04444 core。",
+          "evidence": "14 天内 p50 为 0.04033、p95 为 0.04402、p99 为 0.04435、最大值为 0.04444(E4、E5、E6、E7),高峰期 throttling 为 0.001339(E11),集群 Pending 为 0.0(E20)。燃烧率 0.2982、剩余预算 0.816(E14、E15),有效天数 14、覆盖率 1.0(E8、E9)。",
+          "conclusion": "判定为 ALLOW,条件 A、B、C、D 全部通过。其中条件 B 说明推荐值 0.1 满足 p99 0.04435 的余量,且 throttling 0.001339 远低于阈值。"
         },
         "would_change": [
-          "如果有效历史数据少于 14 天或样本覆盖率低于 0.90,条件 A 将不通过,裁决会改变。",
-          "如果燃烧率超过 1 或剩余预算低于 0.25,条件 C 将不通过,裁决会改变。",
-          "如果高峰期 throttling 升高到 0.05 以上或集群出现 Pending Pod,条件 B 将不通过,裁决会改变。"
+          "若有效历史天数不足 14 天或样本覆盖率低于 0.90,条件 A 将不再通过,判定会改变",
+          "若燃烧率超过 1 或剩余预算低于 0.25,条件 C 将不再通过,判定会改变",
+          "若高峰期 throttling 升高到不低于 0.05,或集群出现 Pending,条件 B 将不再通过,判定会改变"
         ],
-        "proposal": "将 shop/mem-near-oom 的 CPU request 从 0.5 core 调整为 0.1 core,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 18.4544,realizable_usd_month(移除节点后实际节省的金额)为 0.0,节点数保持 6 个不变。",
+        "proposal": "将 mem-near-oom 的 CPU request 从 0.5 core 调整为 0.1 core,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 18.4544,realizable_usd_month(节点移除后实际节省)为 0.0,因为节点数仍为 6 个(nodes_before 6、nodes_after 6)。",
         "evidence": [
           "E1",
           "E3",
@@ -3696,6 +3690,8 @@
           "E5",
           "E6",
           "E7",
+          "E8",
+          "E9",
           "E11",
           "E14",
           "E15",
@@ -3706,7 +3702,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "8aefae02ee15"
+        "cassette": "8abb4533d016"
       },
       "container": "app",
       "slo": {
@@ -3823,14 +3819,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"mem-near-oom\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"mem-near-oom\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -3844,49 +3840,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 1.539608,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 1.846078,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 1.874635,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[14d]))",
           "window": "14d",
           "value": 1.99,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"mem-near-oom\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -4012,13 +4008,13 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "memory 当前 request 为 2.0 GiB，limit 为 2.0 GiB，副本数 2；14 天观测 p50 为 1.539608，p95 为 1.846078，p99 为 1.874635，峰值 max 为 1.99 GiB。",
-          "evidence": "14 天窗口内峰值 1.99 GiB（E7），与 limit 2.0 GiB（E2）几乎持平；同一窗口内发生了 1 次 OOMKilled（E11）。历史数据充足，有效天数 14，覆盖率 1.0（E8、E9）；SLO 燃烧率 0.2982、剩余预算 0.816（E13、E14）。",
-          "conclusion": "verdict 为 DENY，由条件 B 驱动：窗口内有 1 次 OOMKilled，且峰值 1.99 GiB 已贴近 limit 2 GiB，当前配置偏低，不应降配。条件 A、C、D 均为 PASS，推荐值 2.4375 高于当前值 2.0，仅供人工考虑上调。"
+          "status": "shop/mem-near-oom 的内存 request 为 2.0 GiB,limit 为 2.0 GiB,副本数 2。14 天内观测到 p50 为 1.539608,p95 为 1.846078,p99 为 1.874635,最大值为 1.99(单位 GiB)。",
+          "evidence": "14 天窗口内最大工作集为 1.99 GiB,已贴近 limit 2.0 GiB(E7、E2),且窗口内发生 1 次 OOMKilled(E11)。历史数据充足(有效天数 14,覆盖率 1.0),SLO 燃烧率 0.2982、剩余预算 0.816,条件 A、C、D 均通过(E8、E9、E13、E14)。",
+          "conclusion": "最终结论为 DENY,由条件 B 驱动:峰值 1.99 GiB 已贴近 OOM 且有 1 次 OOMKilled,当前配置偏低,不应降配。推荐值 2.4375 高于当前值 2.0,仅供人工考虑上调。"
         },
         "would_change": [
-          "窗口内没有 OOMKilled 事件（E11 为 0）",
-          "峰值内存明显低于 limit，不再贴近 OOM（E7 对比 E2）"
+          "窗口内不再出现 OOMKilled,且峰值工作集明显低于 limit 的 0.9 倍",
+          "人工先上调内存 request/limit 后,再积累新的足够天数的历史数据重新评估"
         ],
         "proposal": null,
         "evidence": [
@@ -4032,7 +4028,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "705b19ac3044"
+        "cassette": "971e136bcc4b"
       },
       "container": "app",
       "slo": {
@@ -4163,14 +4159,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"new-service\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"new-service\",resource=\"cpu\"})",
           "window": "instant",
           "value": 0.5,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"new-service\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"new-service\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
@@ -4184,49 +4180,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.0503,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.05406,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.05447,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.05454,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))",
           "window": "14d@1h",
           "value": 5.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))",
           "window": "14d@1h",
           "value": 0.360119,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"new-service\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -4258,7 +4254,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"new-service\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"new-service\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001292,
           "source": "prometheus"
@@ -4365,13 +4361,13 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "new-service 的 CPU request 为 0.5 core,limit 为 1.0 core,副本数 2。观测到的 CPU 使用 p50 为 0.0503,p95 为 0.05406,p99 为 0.05447,最大值 0.05454。",
-          "evidence": "有效天数只有 5,样本覆盖率为 0.360119(E8、E9),p99 为 0.05447(E6)。条件 B、C、D 均为 PASS:高峰期 throttling 为 0.001292(E11),燃烧率 0.327(E14),剩余预算 0.8078(E15)。",
-          "conclusion": "判定为 UNKNOWN,由条件 A 驱动:有效天数 5 不足 14,覆盖率 0.360119 低于 0.90,数据不足以判定。"
+          "status": "new-service 的 CPU request 为 0.5 core,limit 为 1.0 core,副本数 2。观测到的使用量很低:p50 为 0.0503,p99 为 0.05447,max 为 0.05454。",
+          "evidence": "有效数据只有 5 天,样本覆盖率为 0.360119,不足以支撑结论(E8、E9)。使用量 p99 为 0.05447(E6),高峰期 throttling 为 0.001292(E11),集群 Pending 为 0.0(E20)。SLO 燃烧率 0.327,剩余预算 0.8078(E14、E15)。",
+          "conclusion": "判定为 UNKNOWN,由条件 A 驱动:有效天数 5 不足 14,覆盖率 0.36 低于 0.90。条件 B、C、D 均为 PASS,但在历史数据不足时不能给出缩容结论。"
         },
         "would_change": [
-          "积累至少 14 天的有效 CPU 使用数据(当前为 5 天)",
-          "样本覆盖率提升到至少 0.90(当前为 0.360119)"
+          "有效数据达到至少 14 天(当前 5 天)",
+          "样本覆盖率达到至少 0.90(当前 0.36)"
         ],
         "proposal": null,
         "evidence": [
@@ -4380,11 +4376,12 @@
           "E9",
           "E11",
           "E14",
-          "E15"
+          "E15",
+          "E20"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "c1ed1ca96d15"
+        "cassette": "098c3c839576"
       },
       "container": "app",
       "slo": {
@@ -4516,14 +4513,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"new-service\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"new-service\",resource=\"memory\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"new-service\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"new-service\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -4537,49 +4534,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.300026,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.310746,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.311831,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[14d]))",
           "window": "14d",
           "value": 0.311993,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))",
           "window": "14d@1h",
           "value": 5.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))",
           "window": "14d@1h",
           "value": 0.360119,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"new-service\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"new-service\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -4711,27 +4708,29 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "new-service 的内存 request 为 1.0 GiB,limit 为 2.0 GiB,副本数 2。观测到的使用量 p50 为 0.300026,p95 为 0.310746,p99 为 0.311831,max 为 0.311993。",
-          "evidence": "内存使用的有效天数只有 5,样本覆盖率为 0.360119,而判定需要 14 天和 0.90(E8、E9)。峰值 0.311993 低于 limit 2.0,且无 OOMKilled 事件(E7、E2、E11)。SLO 燃烧率 0.327,剩余预算 0.8078(E13、E14)。",
-          "conclusion": "判定为 UNKNOWN,由条件 A 驱动:有效天数 5 不足 14,覆盖率 0.36 低于 0.90,数据不足以判断。条件 B、C、D 均为 PASS,但不能弥补历史数据不足。"
+          "status": "new-service 的内存 request 为 1.0 GiB,limit 为 2.0 GiB,副本数 2。观测到 p50 为 0.300026,p95 为 0.310746,p99 为 0.311831,max 为 0.311993。",
+          "evidence": "有效天数只有 5,样本覆盖率为 0.36(E8、E9),而峰值 max 为 0.311993(E7),无 OOMKilled 事件(E11)。条件 B、C、D 均为 PASS:燃烧率 0.327,剩余预算 0.8078(E13、E14),缩容后空闲 90.25 GiB 大于回滚所需 1.25 GiB。",
+          "conclusion": "判定为 UNKNOWN,由条件 A 驱动:有效天数 5 不足 14,样本覆盖率 0.36 低于 0.90,数据不足,不能判定。"
         },
         "would_change": [
-          "积累至少 14 天的内存使用数据(当前有效天数为 5)",
-          "样本覆盖率提升到至少 0.90(当前为 0.360119)"
+          "累计至少 14 天的有效内存使用数据(当前 5 天)",
+          "样本覆盖率提升到至少 0.90(当前 0.36)"
         ],
         "proposal": null,
         "evidence": [
           "E7",
           "E8",
           "E9",
-          "E2",
           "E11",
           "E13",
-          "E14"
+          "E14",
+          "E1",
+          "E2",
+          "E3"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "25d3787c250c"
+        "cassette": "2b3cec4fe39c"
       },
       "container": "app",
       "slo": {
@@ -4858,14 +4857,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"packing-trap\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"packing-trap\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"packing-trap\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"packing-trap\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -4879,49 +4878,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 0.12115,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 0.12997,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 0.13072,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 0.13089,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -4953,7 +4952,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"shop\",workload=\"packing-trap\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"shop\",workload=\"packing-trap\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001315,
           "source": "prometheus"
@@ -5060,19 +5059,19 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "packing-trap 的 CPU 当前 request 为 1.0 core,limit 为 2.0 core,副本数 2;近 14 天观测到的使用量 p50 为 0.12115,p95 为 0.12997,p99 为 0.13072,最大值为 0.13089。",
-          "evidence": "14 天内 p99 使用量为 0.13072,最大值仅 0.13089(E6、E7),远低于当前 request;高峰期 throttling 为 0.001315,OOM 事件为 0.0,集群无 Pending Pod(E11、E12、E20)。SLO 燃烧率为 0.316,剩余预算为 0.8062(E14、E15),有效天数 14 且覆盖率 1.0(E8、E9)。",
-          "conclusion": "结论为 ALLOW:条件 A、B、C、D 全部 PASS,且无 HPA 联动。其中条件 B 的推荐值 0.2 满足 p99 加 0.3 余量的要求,条件 D 显示缩容后空闲 20.60 core 大于回滚所需的 1.60 core。"
+          "status": "packing-trap 的 cpu 当前 request 为 1.0 core，limit 为 2.0 core，副本数 2；14 天观测用量 p50 为 0.12115，p99 为 0.13072，max 为 0.13089。",
+          "evidence": "14 天用量 p99 为 0.13072，max 为 0.13089（E6、E7），有效天数 14，覆盖率 1.0（E8、E9）。高峰期 throttling 为 0.001315，OOM 事件为 0.0，集群 Pending 为 0.0（E11、E12、E20）。SLO 燃烧率 0.316，剩余预算 0.8062（E14、E15）。",
+          "conclusion": "verdict 为 ALLOW，条件 A、B、C、D 全部通过，没有 HPA 联动。其中条件 B 是缩容的关键：推荐 request 0.2 高于 p99 加 0.3 headroom 的要求，且 throttling 远低于阈值。"
         },
         "would_change": [
-          "如果有效历史天数少于 14 天或样本覆盖率低于 0.90,条件 A 将不再通过,结论会改变",
-          "如果高峰期 throttling 升高到 0.05 以上或集群出现 Pending Pod,条件 B 将失败",
-          "如果 SLO 燃烧率升高到 1 以上或剩余预算低于 0.25,条件 C 将失败"
+          "如果有效历史天数少于 14 天或样本覆盖率低于 0.90，条件 A 将不通过，verdict 会改变",
+          "如果 SLO 燃烧率升高或剩余预算降到 0.25 以下，条件 C 将不通过，verdict 会改变",
+          "如果缩容后集群空闲 cpu 低于回滚所需容量，条件 D 将不通过，verdict 会改变"
         ],
-        "proposal": "将 packing-trap 的 CPU request 从 1.0 core 调整为 0.2 core,影响 2 个副本。request_value_usd_month(账面释放的预留价值)为 36.9088 美元;realizable_usd_month(节点实际移除后真正节省的金额)为 0.0 美元,节点数保持 6 个不变。",
+        "proposal": "将 packing-trap 的 cpu request 从 1.0 core 调整为 0.2 core，影响 2 个副本。request_value_usd_month（账面释放的预留价值）为 36.9088，realizable_usd_month（移除节点后实际节省）为 0.0，因为节点数仍为 6 个，不会减少。",
         "evidence": [
-          "E4",
-          "E5",
+          "E1",
+          "E3",
           "E6",
           "E7",
           "E8",
@@ -5088,7 +5087,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "4fe33b942924"
+        "cassette": "e9682f4b50c3"
       },
       "container": "app",
       "slo": {
@@ -5209,14 +5208,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"shop\",workload=\"packing-trap\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"shop\",workload=\"packing-trap\",resource=\"memory\"})",
           "window": "instant",
           "value": 8.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"shop\",workload=\"packing-trap\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"shop\",workload=\"packing-trap\",resource=\"memory\"})",
           "window": "instant",
           "value": 10.0,
           "source": "prometheus"
@@ -5230,49 +5229,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 6.701315,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 6.760771,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 6.765685,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[14d]))",
           "window": "14d",
           "value": 6.76699,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"shop\",workload=\"packing-trap\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -5404,20 +5403,18 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "packing-trap 工作负载的内存 request 为 8.0 GiB,limit 为 10.0 GiB,副本数 2。过去 14 天内存工作集 p50 为 6.701315,p95 为 6.760771,最大值为 6.76699,OOM 事件为 0.0。",
-          "evidence": "14 天内存工作集最大值为 6.76699(E7),p99 为 6.765685(E6),OOMKilled 为 0.0(E11)。按方法 max_working_set*(1+0.2) 计算的推荐 request 为 8.125,不低于当前的 8.0(E1),所以没有下调空间;节点数前后均为 6。",
-          "conclusion": "最终结论为 NOOP:推荐值 8.125 不低于当前值 8,无需调整。条件 A、B、C、D 均为 PASS,没有失败条件,结论由推荐值不低于当前 request 这一事实决定。"
+          "status": "packing-trap 的 memory request 为 8.0 GiB,limit 为 10.0 GiB,副本数 2。14 天内观测到的 p95 为 6.760771 GiB,最大值为 6.76699 GiB,OOM 事件为 0.0。",
+          "evidence": "14 天最大工作集为 6.76699 GiB(E7),推荐值为 8.125 GiB,当前 request 为 8.0 GiB(E1),limit 为 10.0 GiB(E2)。条件 A、B、C、D 均为 PASS,燃烧率为 0.316(E13),剩余预算为 0.8062(E14),无 OOMKilled(E11),集群无 Pending(E19)。节点数调整前后均为 6,request_value_usd_month 与 realizable_usd_month 均为 0.0。",
+          "conclusion": "结论为 NOOP:推荐值 8.125 不低于当前值 8,无需下调 request。四项条件均通过,没有失败条件在驱动结论,是推荐值不低于当前值导致无需调整。"
         },
         "would_change": [
-          "如果内存工作集峰值明显下降,使推荐值低于当前 request 8.0,则可能出现下调空间",
-          "如果后续出现 OOMKilled 事件,则需要重新评估是否应上调 request",
-          "如果 SLO 燃烧率超过 1 或剩余预算低于 0.25,则条件 C 将不再通过"
+          "如果推荐值(max_working_set*(1+0.2) 的计算结果)低于当前 request 8.0 GiB,例如工作集峰值明显下降,则会出现可调整的空间",
+          "如果后续观测窗口内内存峰值持续低于当前水平,推荐值会随之下降,verdict 可能不再是 NOOP"
         ],
         "proposal": null,
         "evidence": [
           "E1",
           "E2",
-          "E6",
           "E7",
           "E11",
           "E13",
@@ -5426,7 +5423,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "6be4d8253501"
+        "cassette": "7ff9923efc5d"
       },
       "container": "app",
       "slo": {
@@ -5553,14 +5550,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"tools\",workload=\"no-slo\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"tools\",workload=\"no-slo\",resource=\"cpu\"})",
           "window": "instant",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"tools\",workload=\"no-slo\",resource=\"cpu\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"tools\",workload=\"no-slo\",resource=\"cpu\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
@@ -5574,49 +5571,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.12129,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.12978,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.1307,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.13089,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{namespace=\"tools\",workload=\"no-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_cpu_usage_cores{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -5648,7 +5645,7 @@
         },
         {
           "id": "E11",
-          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{namespace=\"tools\",workload=\"no-slo\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{namespace=\"tools\",workload=\"no-slo\"}[1h])))",
+          "query": "(sum by (workload)(increase(container_cpu_cfs_throttled_periods_total{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))) / (sum by (workload)(increase(container_cpu_cfs_periods_total{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h])))",
           "window": "14d@1h",
           "value": 0.001432,
           "source": "prometheus"
@@ -5741,33 +5738,34 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "该 workload 当前 CPU request 为 1.0 core，limit 为 2.0 core，副本数 2。14 天观测的 CPU 使用 p50 为 0.12129，p99 为 0.1307，max 为 0.13089。",
-          "evidence": "14 天的 p99 使用量为 0.1307，max 为 0.13089（E6、E7），样本覆盖率 1.00，有效天数 14（E8、E9）。高峰期 throttling 为 0.001432（E11），OOM 事件为 0.0（E12），集群 Pending 为 0.0（E18）。SLO 目录和 slo_* 指标均无该 workload 的定义（E14、E15、E16、E17）。",
-          "conclusion": "判定为 REQUIRE_APPROVAL，由条件 C 驱动：SLO 目录里没有该 workload 的定义，状态为 UNKNOWN。条件 A、B、D 均为 PASS，所以只差人工确认 SLO 是否允许这次变更。"
+          "status": "该 workload 当前 CPU request 为 1.0 core，limit 为 2.0 core，副本数 2；14 天内观测 p50 为 0.12129，p99 为 0.1307，max 为 0.13089。",
+          "evidence": "14 天 p99 使用量为 0.1307，max 为 0.13089（E6、E7），高峰期 throttling 为 0.001432，OOM 事件为 0.0（E11、E12），集群无 Pending（E18）。SLO 目录里没有该 workload 的定义，burn rate 与错误预算均为空（E14、E15、E16、E17）。",
+          "conclusion": "裁决为 REQUIRE_APPROVAL，由条件 C 驱动：SLO 状态为 UNKNOWN，无法确认允许变更；条件 A、B、D 均为 PASS。"
         },
         "would_change": [
-          "在 SLO 目录里为 no-slo 定义 SLO（availability、p99_seconds 或 deadline_seconds），使条件 C 可以评估",
-          "定义 SLO 后，burn rate 与剩余错误预算数据可用且处于健康范围，条件 C 即可通过"
+          "在 SLO 目录中为 tools/no-slo 定义 SLO（availability / p99_seconds / deadline_seconds），使条件 C 可以评估",
+          "补充 slo_burn_rate_1h 与 slo_error_budget_remaining_ratio 指标数据，证明当前 burn rate 较低且预算充足"
         ],
-        "proposal": "建议将 tools/no-slo 的 CPU request 从 1.0 core 改为 0.2 core，影响 2 个副本。request_value_usd_month 为 36.9088（账面释放的预留价值），realizable_usd_month 为 140.16（节点从 6 个减到 5 个后实际节省）。人工需要确认该 workload 没有未登记的 SLO 或延迟要求，允许在没有 SLO 定义的情况下缩减。",
+        "proposal": "建议将 cpu request 从 1.0 core 调整为 0.2 core，影响 2 个副本；request_value_usd_month（账面释放的预留价值）为 36.9088，realizable_usd_month（节点实际移除后节省的金额）为 140.16，节点数由 6 降至 5。人工需确认该 workload 没有未登记的 SLO 或延迟、截止时间要求，可以接受此次缩容。",
         "evidence": [
           "E1",
           "E3",
           "E6",
           "E7",
-          "E8",
-          "E9",
           "E11",
           "E12",
           "E14",
           "E15",
           "E16",
           "E17",
-          "E18"
+          "E18",
+          "E19",
+          "E20",
+          "E22"
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "181ab9198c77"
+        "cassette": "0d0643d20d92"
       },
       "container": "app",
       "slo": {
@@ -5892,14 +5890,14 @@
       "evidence": [
         {
           "id": "E1",
-          "query": "max by (workload)(kube_pod_container_resource_requests{namespace=\"tools\",workload=\"no-slo\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_requests{container=\"app\",namespace=\"tools\",workload=\"no-slo\",resource=\"memory\"})",
           "window": "instant",
           "value": 2.0,
           "source": "prometheus"
         },
         {
           "id": "E2",
-          "query": "max by (workload)(kube_pod_container_resource_limits{namespace=\"tools\",workload=\"no-slo\",resource=\"memory\"})",
+          "query": "max by (workload)(kube_pod_container_resource_limits{container=\"app\",namespace=\"tools\",workload=\"no-slo\",resource=\"memory\"})",
           "window": "instant",
           "value": 3.0,
           "source": "prometheus"
@@ -5913,49 +5911,49 @@
         },
         {
           "id": "E4",
-          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.5, container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.800083,
           "source": "prometheus"
         },
         {
           "id": "E5",
-          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.95, container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.829034,
           "source": "prometheus"
         },
         {
           "id": "E6",
-          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(quantile_over_time(0.99, container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.831529,
           "source": "prometheus"
         },
         {
           "id": "E7",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[14d]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[14d]))",
           "window": "14d",
           "value": 0.831979,
           "source": "prometheus"
         },
         {
           "id": "E8",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 14.0,
           "source": "prometheus"
         },
         {
           "id": "E9",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))",
           "window": "14d@1h",
           "value": 1.0,
           "source": "prometheus"
         },
         {
           "id": "E10",
-          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{namespace=\"tools\",workload=\"no-slo\"}[1h]))",
+          "query": "max by (workload)(max_over_time(container_memory_working_set_bytes{container=\"app\",namespace=\"tools\",workload=\"no-slo\"}[1h]))",
           "window": "14d@1h",
           "value": [
             0,
@@ -6073,19 +6071,16 @@
       "narrative": {
         "source": "llm",
         "why": {
-          "status": "该 workload 当前内存 request 为 2.0 GiB,limit 为 3.0 GiB,副本数 2。14 天内观测到的 p50 为 0.800083,p95 为 0.829034,p99 为 0.831529,最大值 0.831979,无 OOMKilled 事件。",
-          "evidence": "14 天历史数据完整(有效天数 14,覆盖率 1.0),峰值 0.831979 远低于推荐值 1.0 GiB,且 OOMKilled 为 0.0、集群无 Pending Pod(E7、E11、E17),因此条件 A、B、D 均通过。但 SLO 目录中没有该 workload 的定义,burn rate 和错误预算均为空(E13、E14、E15、E16)。",
-          "conclusion": "判定为 REQUIRE_APPROVAL,由条件 C 驱动:条件 C 状态为 UNKNOWN,因为 SLO 目录里没有该 workload 的定义,无法确认 SLO 是否允许变更。"
+          "status": "tools 命名空间的 no-slo 工作负载,内存 request 为 2.0 GiB,limit 为 3.0 GiB,副本数 2。14 天内观测到的内存 p50 为 0.800083,p95 为 0.829034,p99 为 0.831529,max 为 0.831979,OOM 事件为 0.0。",
+          "evidence": "14 天窗口内 max 为 0.831979(E7),无 OOMKilled(E11),集群 Pending 为 0.0(E17),因此条件 A、B、D 均为 PASS。但 SLO 目录与 slo_* 指标都没有该 workload 的数据(E13、E14、E15、E16),条件 C 为 UNKNOWN。",
+          "conclusion": "判定为 REQUIRE_APPROVAL,由条件 C 驱动:SLO 目录里没有该 workload 的定义,无法确认 SLO 是否允许变更,需要人工确认。"
         },
         "would_change": [
-          "在 SLO 目录中为 tools/no-slo 定义 SLO(availability、p99_seconds 或 deadline_seconds),并提供可用的 burn rate 与剩余错误预算",
-          "SLO 定义补齐且 burn rate 与错误预算显示允许变更,条件 C 即可转为 PASS"
+          "在 SLO 目录里为 tools/no-slo 定义 SLO(availability、p99_seconds 或 deadline_seconds)",
+          "提供可用的 slo_burn_rate_1h 与 slo_error_budget_remaining_ratio 数据,并且数值在允许变更的范围内"
         ],
-        "proposal": "将 tools/no-slo 的内存 request 从 2.0 GiB 调整为 1.0 GiB,影响 2 个副本;request_value_usd_month(账面释放的预留价值)为 5.986,realizable_usd_month(移除节点后实际节省)为 0.0,节点数前后均为 6。人工需确认该 workload 没有未登记的 SLO 要求,可以接受这次内存缩容。",
+        "proposal": "将 tools/no-slo 的内存 request 从 2.0 GiB 调整为 1.0 GiB,影响 2 个副本。节省:request_value_usd_month 为 5.986(账面释放的预留价值),realizable_usd_month 为 0.0(节点数 nodes_before 6、nodes_after 6,没有节点被移除,实际不节省)。需要人工确认该 workload 的 SLO 允许这次变更,因为 SLO 目录里没有它的定义(条件 C 未知)。",
         "evidence": [
-          "E1",
-          "E2",
-          "E3",
           "E7",
           "E11",
           "E13",
@@ -6096,7 +6091,7 @@
         ],
         "redactions": 0,
         "model": "sonnet",
-        "cassette": "fddfb387f44b"
+        "cassette": "cb1b2a582dd9"
       },
       "container": "app",
       "slo": {

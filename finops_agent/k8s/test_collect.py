@@ -189,7 +189,8 @@ class CollectTest(unittest.TestCase):
         for f in self.out["facts"]:
             for e in f["evidence"]:
                 for tok in re.findall(r"\b[a-z]+_[a-z_0-9]+\b", re.sub(r'"[^"]*"', "", e["query"])):
-                    if tok in {"max_over_time", "quantile_over_time", "min_over_time", "avg_over_time"}:
+                    if tok in {"max_over_time", "quantile_over_time", "min_over_time", "avg_over_time",
+                               "ols_slope_per_day", "daily_max", "ols_projection"}:   # trend evidence is descriptive (see collect.resource_measures)
                         continue
                     self.assertIn(tok, known | {"by"}, (e["query"], tok))
 
@@ -220,6 +221,134 @@ class CollectTest(unittest.TestCase):
         empty = lambda url: {"status": "success", "data": {"resultType": "vector", "result": []}}
         with self.assertRaises(RuntimeError):
             collect_facts(Prom("http://prom", Trace(), empty), POLICY)
+
+
+def ramp(per_day, start=1.0, days=14, as_of=AS_OF):
+    """hourly memory series (GiB) with a daily-peaked shape on top of a linear ramp of `per_day` GiB/day"""
+    t0 = as_of - days * 86400
+    pts = []
+    for k in range(days * 24 + 1):
+        ts = t0 + k * 3600
+        pts.append([ts, str((start + per_day * k / 24 + (0.05 if int(ts // 3600) % 24 in (9, 10) else 0)) * GIB)])
+    return pts
+
+
+def trend_fetch(mem_pts, cpu_pts=None, container=None, sidecar_factor=None):
+    """stub_fetch with the memory (and cpu) hourly series replaced; optionally a `container` label on the replicas series
+    and a sidecar that inflates every per-container query that does not name the container."""
+    seen = []
+
+    def fetch(url):
+        u = urlparse(url)
+        qs = parse_qs(u.query)
+        q = qs.get("query", [""])[0]
+        seen.append((u.path, q))
+        out = fake(u.path, qs)
+        if container and u.path == "/api/v1/query" and C.DEPLOY_REPLICAS in q and q.startswith("max by (workload, container)"):
+            for r in out["data"]["result"]:
+                r["metric"]["container"] = container
+        per_container = any(m in q for m in (C.CPU_USAGE, C.MEM_WS, C.CFS_PERIODS, C.CFS_THROTTLED, C.REQUESTS, C.LIMITS)) \
+            and 'workload="api"' in q and "by (namespace, workload, pod)" not in q
+        if sidecar_factor and per_container and f'container="{container}"' not in q:
+            for r in out["data"]["result"]:
+                if "value" in r:
+                    r["value"][1] = str(float(r["value"][1]) * sidecar_factor)
+                else:
+                    r["values"] = [[t, str(float(v) * sidecar_factor)] for t, v in r["values"]]
+        if u.path == "/api/v1/query_range" and 'workload="api"' in q:
+            if C.MEM_WS in q and mem_pts is not None:
+                out["data"]["result"][0]["values"] = mem_pts
+            if C.CPU_USAGE in q and cpu_pts is not None:
+                out["data"]["result"][0]["values"] = cpu_pts
+        return out
+    fetch.seen = seen
+    return fetch
+
+
+def collect_with(fetch, policy=POLICY):
+    return collect_facts(Prom("http://prom", Trace(), fetch), policy, as_of=AS_OF)
+
+
+class ContainerFilterTest(unittest.TestCase):
+    def test_selectors_name_the_container_and_a_sidecar_does_not_inflate_usage(self):
+        f = trend_fetch(None, container="app", sidecar_factor=10)
+        out = collect_with(f)
+        mem = pick(out, "api", "memory")
+        cpu = pick(out, "api", "cpu")
+        self.assertEqual((mem["usage"]["max"], mem["current"]["request"], mem["current"]["limit"]), (2.0, 4.0, 6.0))
+        self.assertEqual((cpu["usage"]["p99"], cpu["usage"]["max"], cpu["current"]["request"]), (0.5, 0.9, 2.0))
+        self.assertAlmostEqual(cpu["usage"]["throttle_peak"], 0.01)
+        self.assertEqual(mem["container"], "app")
+        for e in mem["evidence"] + cpu["evidence"]:
+            if any(m in e["query"] for m in (C.CPU_USAGE, C.MEM_WS, C.CFS_PERIODS, C.REQUESTS, C.LIMITS)) and 'workload="api"' in e["query"]:
+                self.assertIn('container="app"', e["query"], e["query"])
+
+    def test_every_usage_throttle_request_limit_query_is_pinned(self):
+        f = trend_fetch(None, container="app")
+        collect_with(f)
+        for path, q in f.seen:
+            if 'workload="api"' in q and any(m in q for m in (C.CPU_USAGE, C.MEM_WS, C.CFS_PERIODS, C.CFS_THROTTLED, C.REQUESTS, C.LIMITS)):
+                self.assertIn('container="app"', q, q)
+
+    def test_without_a_container_label_selectors_are_unchanged(self):
+        f = trend_fetch(None, container=None)
+        out = collect_with(f)
+        self.assertIsNone(pick(out, "api", "cpu")["container"])
+        self.assertFalse(any('container="' in q for _, q in f.seen))
+
+
+class TrendCollectTest(unittest.TestCase):
+    def test_rising_memory_triggers_and_b_fails(self):
+        out = collect_with(trend_fetch(ramp(0.114)))
+        f = pick(out, "api", "memory")
+        tr = f["usage"]["trend"]
+        self.assertTrue(tr["triggered"])
+        self.assertAlmostEqual(tr["slope"], 0.114, places=2)
+        self.assertGreater(tr["r2"], 0.95)
+        ids = [e["query"] for e in f["evidence"]]
+        self.assertTrue(any(q.startswith("ols_slope_per_day") for q in ids))
+        self.assertIn("trend_slope", f["ev"])
+        d = next(x for x in decide(out["facts"], out["cluster"], POLICY) if x["id"] == "K-shop-api-memory")
+        self.assertEqual(d["conditions"]["B"]["status"], "FAIL")
+        self.assertEqual(d["verdict"], "DENY")
+        self.assertIn("持续爬升", d["conditions"]["B"]["why"])
+        self.assertNotIn("trend", d["usage"])
+        self.assertTrue({f["ev"]["trend_slope"], f["ev"]["trend_proj"]} <= set(d["conditions"]["B"]["evidence"]))
+
+    def test_flat_memory_does_not_trigger(self):
+        out = collect_with(trend_fetch(ramp(0.0)))
+        f = pick(out, "api", "memory")
+        self.assertFalse(f["usage"]["trend"]["triggered"])
+        self.assertNotIn("trend_slope", f["ev"])          # evidence only when the trend is a factor
+        d = next(x for x in decide(out["facts"], out["cluster"], POLICY) if x["id"] == "K-shop-api-memory")
+        self.assertEqual(d["conditions"]["B"]["status"], "PASS")
+
+    def test_falling_memory_does_not_fail(self):
+        out = collect_with(trend_fetch(ramp(-0.05, start=2.0)))
+        f = pick(out, "api", "memory")
+        self.assertFalse(f["usage"]["trend"]["triggered"])
+        d = next(x for x in decide(out["facts"], out["cluster"], POLICY) if x["id"] == "K-shop-api-memory")
+        self.assertNotIn("持续爬升", d["conditions"]["B"]["why"])
+        self.assertNotEqual(d["conditions"]["B"]["status"], "FAIL")
+
+    def test_cpu_is_not_trended_by_default_but_can_be_switched_on(self):
+        cpu = [[t, str(float(v) / GIB)] for t, v in ramp(0.114)]
+        out = collect_with(trend_fetch(None, cpu_pts=cpu))
+        self.assertIsNone(pick(out, "api", "cpu")["usage"]["trend"])
+        self.assertNotIn("trend_slope", pick(out, "api", "cpu")["ev"])
+        pol = {**POLICY, "trend_resources": ["memory", "cpu"]}
+        on = collect_with(trend_fetch(None, cpu_pts=cpu), pol)
+        self.assertTrue(pick(on, "api", "cpu")["usage"]["trend"]["triggered"])
+
+    def test_noisy_series_without_a_trend_is_ignored(self):
+        pts = ramp(0.0)
+        pts = [[t, str(float(v) * (1.3 if (int(t // 86400) % 2) else 1.0))] for t, v in pts]   # alternating days, no slope
+        f = pick(collect_with(trend_fetch(pts)), "api", "memory")
+        self.assertFalse(f["usage"]["trend"]["triggered"])
+
+    def test_too_few_days_gives_no_trend(self):
+        pts = ramp(0.114)[: 5 * 24]
+        self.assertIsNone(pick(collect_with(trend_fetch(pts)), "api", "memory")["usage"]["trend"])
 
 
 class EndToEndTest(unittest.TestCase):

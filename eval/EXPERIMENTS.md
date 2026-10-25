@@ -439,3 +439,35 @@ n=20 个 (workload, resource)；verdict_accuracy 18/20 的 Wilson 95% 区间约 
 - **独立性。** 同一个作者、同一个生成器家族；两条（route-quote/cpu 的区间、ledger-api/cpu 的金额）部分是我的 `expect` 与契约规则或输入通道不一致，不全是 agent 的缺陷；
 - **真实集群上的失败率。** 合成数据没有真实世界的噪声与形状；
 - **录制的稳定性。** 每条叙述只录了一次。
+
+### 8.5 修复后在第一个预注册世界上重跑（已污染，不能当成泛化证据）
+
+c0037 按 §8.4 修了 agent 一侧的三类缺陷：条件 B 的趋势子项、用量选择器按容器过滤、`--nodes-from` 读取世界的 `pricing`。第一个预注册世界（`k8s_fresh_world.yaml`）的失败驱动了这次修复，所以它对这三类问题**已经被污染**：下面的数字证明修复生效，不证明泛化。泛化要靠一个在修复之前冻结、修复之后才评估一次的新世界。`bash eval/k8s_heldout.sh` 复现（record 一次，之后回放；原始输出：`openspec/changes/c0037-k8s-fix-heldout-misses/` 下的 `eval_record_output.txt`、`k8s_fresh_decisions.json`、`k8s_fresh_eval.json`）。
+
+| 指标 | 修复前（§8.3） | 修复后（污染） |
+|---|---|---|
+| verdict_accuracy | 0.90（18/20） | 1.0（20/20），Wilson 95% 约 [0.84, 1.0] |
+| unsafe_allow | 1 | 0 |
+| unknown_recall | 1.0（2/2） | 1.0（2/2） |
+| request_in_range | 0.7692（10/13） | 0.9231（12/13） |
+| realizable_accuracy | 0.6667（2/3） | 1.0（3/3） |
+
+`request_in_range` 的分母（只数 ALLOW 与 REQUIRE_APPROVAL）变了：session-store/memory 改判 DENY，退出分母；edge-gateway/memory 从 NOOP 变 ALLOW，进入分母。12/13 对应的唯一漏检是 route-quote/cpu。评分器仍以退出码 1 报闸门失败：`request_in_range` 低于基础世界基线 1.0。这个基线对着基础世界定的，闸门的绝对阈值（0.8）已过。
+
+逐条看原来的漏检：
+
+| workload/资源 | 修复前 | 修复后 | 说明 |
+|---|---|---|---|
+| session-store/memory（unsafe） | ALLOW 2.9375 | **DENY**，推荐仍是 2.9375 | B FAIL：每日峰值斜率 0.076798 GiB/天（R² 0.999978），外推 14 天约 3.48859 GiB，推荐低于它 ×(1+0.1)。推荐公式没改，所以推荐值与 `expect` 的区间 [3.3, 3.9] 的差距还在；区间只对 ALLOW 与 REQUIRE_APPROVAL 计分，DENY 不计 |
+| edge-gateway/memory | NOOP（推荐 1.75） | ALLOW 0.6875，区间 [0.65, 0.8] 内 | sidecar 不再混入 |
+| edge-gateway/cpu | ALLOW 0.55，区间外 | ALLOW 0.3，区间 [0.25, 0.35] 内 | 同上 |
+| ledger-api/cpu（realizable） | 140.16 | 280.32，区间 [270, 290] 内 | 世界的 `node_hour_usd` 0.384 进入了节省估算；节点数 7 → 6 一直是对的 |
+| route-quote/cpu | ALLOW 0.30，区间 [1.5, 1.9] 外 | 不变 | **没有修**：§8.4 把它归因为契约（p99 × 1.3）与 `expect`（按尖峰定容）的分歧，是契约问题，留给维护者；它的 realizable 金额因定价通道翻倍（280.32 → 560.64），这是定价修复的副作用，不是推荐变了 |
+
+其余 15 条的 verdict 与推荐值与修复前逐条相同；其中 eod-reconcile/cpu 与 rate-engine/cpu 的 `realizable_usd_month` 随世界定价翻倍（140.16 → 280.32），也不是推荐变了。
+
+诚实的限制：
+
+- 趋势守卫的阈值（14 天外推、R² ≥ 0.6、涨幅 ≥ 10%）是读着这个世界的失败设的，而不是独立标定的。两个世界里的序列要么是线性爬升、要么是平稳，没有测过 R² 在阈值附近的灰色地带，不知道阈值在中间地带的行为；
+- 趋势守卫只对内存启用（配置可开 cpu），理由见 `openspec/changes/c0037-k8s-fix-heldout-misses/proposal.md`；cpu 的持续增长不会被它拦住，这在合成世界里没有被测过；
+- 趋势子项触发时，报告里两条趋势证据暂无人话标签（`report.py` 不在本 change 范围），显示为「（未标注）」。
