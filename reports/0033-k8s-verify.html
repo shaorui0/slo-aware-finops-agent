@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0033-k8s-verify</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0033-k8s-verify</h1>
+</header>
+<h1 id="c0033-k8s-节省核实">c0033 K8s 节省核实</h1>
+<h2 id="做了什么">做了什么</h2>
+<p>主线之前只回答「该改什么」。这次回答「改了之后账单真的降了吗」。核实器
+<code>finops_agent/k8s/verify.py</code> 比较 BEFORE 与 AFTER 两个 7
+天窗口的节点小时账单，把账单变化精确分解为五类原因，再逐条给出预测、实际、实现率和偏差原因。</p>
+<ul>
+<li>每个小时的节点数不是手填的，是对当小时全部 pod 的 requests 做
+first-fit decreasing（和决策里算「可兑现」是同一个函数）。HPA
+副本数由世界生成的用量按公式推出。</li>
+<li>场景覆盖层 <code>after_apply.yaml</code>（四条计划加一次无关增长）与
+<code>after_clean.yaml</code>（对照）在基础世界上加带时间的事件，不改
+<code>k8s_world.yaml</code>。</li>
+<li><code>make k8s-verify</code> 产出
+<code>runs/k8s-verify/k8s_verify.json</code>（c0032 契约形状）并重新生成
+<code>docs/K8S_SAVINGS_VERIFICATION.md</code>。</li>
+</ul>
+<h2 id="结果">结果</h2>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>变更</th>
+<th>预测 $/月</th>
+<th>实际 $/月</th>
+<th>实现率</th>
+<th>偏差原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>api-steady cpu 1 到 0.25</td>
+<td>140.16</td>
+<td>140.16</td>
+<td>100%</td>
+<td>无</td>
+</tr>
+<tr>
+<td>packing-trap cpu 1 到 0.2</td>
+<td>0</td>
+<td>0</td>
+<td>无法定义</td>
+<td>(e) 装箱没兑现，账面释放 36.91 没进账单</td>
+</tr>
+<tr>
+<td>hpa-managed cpu 1 到 0.45</td>
+<td>0</td>
+<td>0</td>
+<td>无法定义</td>
+<td>(b) +70.08 与 (c) -70.08 抵消</td>
+</tr>
+<tr>
+<td>no-slo cpu 1 到 0.2（被回滚）</td>
+<td>140.16</td>
+<td>0</td>
+<td>0%</td>
+<td>(b) -70.08，(d) -70.08</td>
+</tr>
+</tbody>
+</table>
+<p>账单从 $840.96 变到 $770.88，变化 -$70.08/月。控制组校正后的实际合计
+$140.16，预测合计 $280.32，实现率
+50%。两个「实际」不同：无关增长让账单多了 $70.08，吃掉了一半节省。</p>
+<p>闭合：各原因之和 -70.08，账单变化 -70.08，差
+4e-14。所有应用顺序下都闭合（单测遍历 24 种）。</p>
+<h2 id="验收">验收</h2>
+<p>见
+<code>openspec/changes/c0033-k8s-verify/evidence.md</code>：<code>make k8s-verify</code>
+输出、单测 30 项、全量 316 + 71 项、<code>check_rules --docs</code>
+通过、<code>make k8s-eval</code> 18/18
+指标与改动前一致、<code>k8s_world.yaml</code> 无改动。</p>
+<h2 id="取舍与局限">取舍与局限</h2>
+<ul>
+<li>预测取决策的 <code>realizable_usd_month</code>。packing-trap 与
+hpa-managed 单独应用本来就预测
+0，所以它们的实现率无法定义。核实的价值是确认账单没有意外。</li>
+<li>装箱不可加，单条归因按应用顺序。换顺序单条数字会变，总数不变。</li>
+<li>HPA 模型没有容忍带与稳定窗口；合成指标不随 request
+变化，<code>slo_ok</code> 只反映世界自带的 SLO 信号。</li>
+</ul>
+</body>
+</html>
