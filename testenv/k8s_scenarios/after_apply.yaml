@@ -1,0 +1,23 @@
+# 应用后 14 天（2026-10-26 到 2026-11-09）：四条计划被执行，窗口中途还有一条无关的副本增长。
+# 世界生成器只认 scenario / cluster / add_events 里的 load 事件；set_request / rollback / scale 是核实器
+# （finops_agent.k8s.verify）读的带时间事件，metrics_server 忽略它们。
+# 节点数不在这里：每个小时的节点数由核实器对当小时全部 pod 的 requests 做 FFD 得出。
+scenario: {name: after_apply, base: testenv/k8s_world.yaml}
+cluster:
+  period: {end: "2026-11-09T00:00:00Z"}
+verify:
+  before: {start: "2026-10-19T00:00:00Z", end: "2026-10-26T00:00:00Z"}
+  after: {start: "2026-11-02T00:00:00Z", end: "2026-11-09T00:00:00Z"}
+add_events:
+  api-steady:       # 干净的一条：cpu 1 -> 0.25，没有回滚
+    - {type: set_request, at: "2026-10-26T00:00:00Z", plan_id: P-K-shop-api-steady-cpu-0.25, resource: cpu, request: 0.25}
+  packing-trap:     # 账面降了，节点被 8Gi 内存钉住
+    - {type: set_request, at: "2026-10-26T06:00:00Z", plan_id: P-K-shop-packing-trap-cpu-0.2, resource: cpu, request: 0.2}
+  hpa-managed:      # 人工批准后第二天才应用；应用后负载涨到 1.5 倍
+    - {type: set_request, at: "2026-10-27T00:00:00Z", plan_id: P-K-shop-hpa-managed-cpu-0.45, resource: cpu, request: 0.45}
+    - {type: load, at: "2026-10-30T00:00:00Z", factor: 1.5}
+  no-slo:           # 应用后三天被人工回滚
+    - {type: set_request, at: "2026-10-27T06:00:00Z", plan_id: P-K-tools-no-slo-cpu-0.2, resource: cpu, request: 0.2}
+    - {type: rollback, at: "2026-10-29T06:00:00Z", plan_id: P-K-tools-no-slo-cpu-0.2}
+  new-service:      # 无关增长：另一个团队在 AFTER 窗口中途把副本从 2 扩到 6
+    - {type: scale, at: "2026-11-05T12:00:00Z", replicas: 6}
