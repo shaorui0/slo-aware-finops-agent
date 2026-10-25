@@ -264,6 +264,11 @@ class WeeklyMonthlyTest(unittest.TestCase):
         self.assertIn("无 SLO，不可判", p)
         self.assertNotIn("退化", p.split("核实结果")[1].split("偏差按原因拆开")[0])
 
+    def test_trend_evidence_is_labelled(self):
+        labels = R.evidence_labels([{"id": "E30", "query": "ols_slope_per_day(daily max of x)", "window": "14d"},
+                                    {"id": "E31", "query": "ols_projection(x, +14d)", "window": "14d"}])
+        self.assertEqual(labels, {"E30": "每日峰值的增长斜率（每天）", "E31": "按趋势外推后的峰值"})
+
     def test_weekly_content(self):
         i = inputs(state=json.loads((FX / "demo/k8s_state.json").read_text()))
         p = text(R.render("weekly", i))

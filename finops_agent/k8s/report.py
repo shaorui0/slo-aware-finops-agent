@@ -328,7 +328,11 @@ def evidence_labels(evs) -> dict:
     for e in evs:
         q, w = str(e.get("query")), str(e.get("window"))
         label = None
-        if q.startswith("slo_catalog:"):
+        if q.startswith("ols_slope_per_day("):          # c0037 trend guard: least squares over daily maxima
+            label = "每日峰值的增长斜率（每天）"
+        elif q.startswith("ols_projection("):
+            label = "按趋势外推后的峰值"
+        elif q.startswith("slo_catalog:"):
             label = _SLO_CATALOG.get(q.rsplit(".", 1)[-1])
         elif "kube_pod_container_resource_requests" in q:
             cpu = 'resource="cpu"' in q
