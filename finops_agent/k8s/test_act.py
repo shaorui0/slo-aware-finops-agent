@@ -232,6 +232,7 @@ class ActTest(unittest.TestCase):
     def test_status_and_cli(self):
         self.approve()
         plans = self.root / "runs/r1/k8s_plans.json"
+        plans.parent.mkdir(parents=True, exist_ok=True)
         plans.write_text(json.dumps([self.plan]))
         self.run_apply(FakeKube())
         import io
