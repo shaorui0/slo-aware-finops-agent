@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>c0038-k8s-fresh2-eval</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">c0038-k8s-fresh2-eval</h1>
+</header>
+<h2 id="why">Why</h2>
+<p>c0037 按第一个预注册世界（c0035）的失败修了
+agent，那个世界因此被污染，只能说明修复生效，不能说明泛化。c0036
+在修复之前盲写并冻结了第二个世界（冻结 sha 10eefdb，早于 c0037
+的第一个实现提交 ff2931a）。本 change 对它评估一次，结果原样记录。</p>
+<h2 id="what-changes">What Changes</h2>
+<ul>
+<li><code>eval/k8s_heldout.sh</code> 增加
+<code>K8S_WORLD</code>、<code>K8S_SLOS</code>
+两个环境变量，默认值不变，这样同一个脚本可以评估第二个世界。</li>
+<li>评估一次：record 模式（真实 <code>claude -p</code>），新增叙述
+cassette，不修改已有 cassette。</li>
+<li><code>eval/EXPERIMENTS.md</code> 追加
+§9：冻结与评估的提交顺序、指标、逐条失分归因、污染披露。</li>
+</ul>
+<h2 id="规则评估前写下">规则（评估前写下）</h2>
+<ul>
+<li>评估之后不改世界、不改 expect、不改 agent
+和阈值；失分记为发现，修复留给之后的
+change，且修复后需要第三个预注册世界。</li>
+<li>污染披露：主 agent 在 c0036 的回执里看到了这个世界的难例清单（各
+workload 的情形概述），但没有转述给做修复的 agent（c0037），c0037 的
+prompt 明确禁止读取这些文件。c0036 的作者在写之前从 <code>git log</code>
+标题里看到过 c0035 的聚合数字。</li>
+<li>评估由主 agent 执行，这是本次运行中唯一由主 agent
+执行的评估；理由是做修复的 agent 不能碰这个世界。</li>
+</ul>
+<h2 id="impact">Impact</h2>
+<p>只改
+<code>eval/k8s_heldout.sh</code>（加环境变量）、<code>eval/EXPERIMENTS.md</code>（追加）、<code>eval/cassettes/</code>（新增）。不涉及
+AWS 或集群写操作。 # c0038 验收证据</p>
+<h2 id="冻结完整性评估前">冻结完整性（评估前）</h2>
+<pre><code>$ git diff --stat 10eefdb HEAD -- testenv/heldout/k8s_fresh2_world.yaml testenv/heldout/k8s_fresh2_slos.yaml testenv/test_k8s_fresh2.py
+（空）
+$ shasum -a 256 testenv/heldout/k8s_fresh2_world.yaml
+cb493ab62c2ec57b47a8bf8a88f2a10a853627c5f1c8855787cb9f5f0c0d700c
+$ git merge-base --is-ancestor 10eefdb HEAD &amp;&amp; echo freeze-is-ancestor
+freeze-is-ancestor
+10eefdb 2026-10-26 01:59:08 +0900 c0036 freeze
+ff2931a 2026-10-26 02:26:25 +0900 c0037 第一个实现提交</code></pre>
+<h2 id="评估一次record真实-claude--p">评估一次（record，真实 claude
+-p）</h2>
+<p>见同目录 <code>eval_record_output.txt</code>：</p>
+<pre><code>k8s run k8s-fresh2: 22 decisions {&#39;ALLOW&#39;: 13, &#39;DENY&#39;: 4, &#39;REQUIRE_APPROVAL&#39;: 5}, plans 18, narrative {&#39;llm&#39;: 22}
+GATE FAILED: unknown_recall 0.0 &lt; 1.0; ...
+{&quot;verdict_accuracy&quot;: 0.9167, &quot;unsafe_allow&quot;: 0, &quot;unknown_recall&quot;: 0.0, &quot;request_in_range&quot;: 0.9444, &quot;realizable_accuracy&quot;: null}
+n={&#39;expected&#39;: 24, &#39;decisions&#39;: 22, &#39;unknown_expected&#39;: 2, &#39;ranged&#39;: 18, &#39;realizable&#39;: 0} narrative={&#39;llm&#39;: 22}
+wrong: edge-collector/cpu got None expect UNKNOWN, edge-collector/memory got None expect UNKNOWN
+exit=1</code></pre>
+<h2 id="事后核对只读不改任何东西">事后核对（只读，不改任何东西）</h2>
+<ul>
+<li>edge-collector：<code>count(kube_deployment_spec_replicas{workload="edge-collector"})</code>
+在 as_of 为空；<code>count(max_over_time(...[14d]))</code> 为
+1。workload 在窗口内存在，as_of
+时刻无数据，所以被瞬时查询发现漏掉。</li>
+<li>session-cache：<code>max(max_over_time(container_memory_working_set_bytes{workload="session-cache"}[14d]))</code>
+= 2.66 GiB；<code>[28d]</code> = 4.64 GiB。agent 用 14 天窗口，expect
+用全周期。</li>
+</ul>
+<h2 id="回放复现">回放复现</h2>
+<p>评估之后用回放模式重跑一次，结果与 record 一致（见下方命令输出）。
+{“verdict_accuracy”: 0.9167, “unsafe_allow”: 0, “unknown_recall”: 0.0,
+“request_in_range”: 0.9444, “realizable_accuracy”: null} wrong:
+edge-collector/cpu got None expect UNKNOWN, edge-collector/memory got
+None expect UNKNOWN</p>
+</body>
+</html>
