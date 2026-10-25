@@ -1,0 +1,98 @@
+{
+  "n": 18,
+  "verdict_accuracy": 0.8889,
+  "unsafe_allow": 0,
+  "unknown_recall": 1.0,
+  "items": [
+    {
+      "id": "K-data-batch-nightly-cpu",
+      "expect": "DENY",
+      "got": "REQUIRE_APPROVAL"
+    },
+    {
+      "id": "K-data-batch-nightly-memory",
+      "expect": "DENY",
+      "got": "REQUIRE_APPROVAL"
+    },
+    {
+      "id": "K-shop-api-steady-cpu",
+      "expect": "ALLOW",
+      "got": "ALLOW"
+    },
+    {
+      "id": "K-shop-api-steady-memory",
+      "expect": "ALLOW",
+      "got": "ALLOW"
+    },
+    {
+      "id": "K-shop-api-tidal-cpu",
+      "expect": "DENY",
+      "got": "DENY"
+    },
+    {
+      "id": "K-shop-api-tidal-memory",
+      "expect": "NOOP",
+      "got": "NOOP"
+    },
+    {
+      "id": "K-shop-burning-slo-cpu",
+      "expect": "DENY",
+      "got": "DENY"
+    },
+    {
+      "id": "K-shop-burning-slo-memory",
+      "expect": "DENY",
+      "got": "DENY"
+    },
+    {
+      "id": "K-shop-hpa-managed-cpu",
+      "expect": "REQUIRE_APPROVAL",
+      "got": "REQUIRE_APPROVAL"
+    },
+    {
+      "id": "K-shop-hpa-managed-memory",
+      "expect": "ALLOW",
+      "got": "ALLOW"
+    },
+    {
+      "id": "K-shop-mem-near-oom-cpu",
+      "expect": "ALLOW",
+      "got": "ALLOW"
+    },
+    {
+      "id": "K-shop-mem-near-oom-memory",
+      "expect": "DENY",
+      "got": "DENY"
+    },
+    {
+      "id": "K-shop-new-service-cpu",
+      "expect": "UNKNOWN",
+      "got": "UNKNOWN"
+    },
+    {
+      "id": "K-shop-new-service-memory",
+      "expect": "UNKNOWN",
+      "got": "UNKNOWN"
+    },
+    {
+      "id": "K-shop-packing-trap-cpu",
+      "expect": "ALLOW",
+      "got": "ALLOW"
+    },
+    {
+      "id": "K-shop-packing-trap-memory",
+      "expect": "NOOP",
+      "got": "NOOP"
+    },
+    {
+      "id": "K-tools-no-slo-cpu",
+      "expect": "REQUIRE_APPROVAL",
+      "got": "REQUIRE_APPROVAL"
+    },
+    {
+      "id": "K-tools-no-slo-memory",
+      "expect": "REQUIRE_APPROVAL",
+      "got": "REQUIRE_APPROVAL"
+    }
+  ]
+}

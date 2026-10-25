@@ -1,0 +1,736 @@
+{
+  "plans": [
+    {
+      "plan_id": "P-K-data-batch-nightly-cpu-1350m",
+      "decision_id": "K-data-batch-nightly-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "2000m"
+        },
+        "limits": {
+          "cpu": "2000m"
+        },
+        "replicas": 1
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "batch-nightly",
+                  "resources": {
+                    "requests": {
+                      "cpu": "1350m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n data patch deploy batch-nightly --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"batch-nightly\", \"resources\": {\"requests\": {\"cpu\": \"1350m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n data patch deploy batch-nightly --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"batch-nightly\", \"resources\": {\"requests\": {\"cpu\": \"2000m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-data-batch-nightly-cpu-1350m.approved"
+    },
+    {
+      "plan_id": "P-K-data-batch-nightly-memory-1536Mi",
+      "decision_id": "K-data-batch-nightly-memory",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "memory": "4096Mi"
+        },
+        "limits": {
+          "memory": "6144Mi"
+        },
+        "replicas": 1
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "batch-nightly",
+                  "resources": {
+                    "requests": {
+                      "memory": "1536Mi"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n data patch deploy batch-nightly --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"batch-nightly\", \"resources\": {\"requests\": {\"memory\": \"1536Mi\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n data patch deploy batch-nightly --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"batch-nightly\", \"resources\": {\"requests\": {\"memory\": \"4096Mi\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-data-batch-nightly-memory-1536Mi.approved"
+    },
+    {
+      "plan_id": "P-K-shop-api-steady-cpu-250m",
+      "decision_id": "K-shop-api-steady-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "1000m"
+        },
+        "limits": {
+          "cpu": "2000m"
+        },
+        "replicas": 3
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "api-steady",
+                  "resources": {
+                    "requests": {
+                      "cpu": "250m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy api-steady --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"api-steady\", \"resources\": {\"requests\": {\"cpu\": \"250m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy api-steady --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"api-steady\", \"resources\": {\"requests\": {\"cpu\": \"1000m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-api-steady-cpu-250m.approved"
+    },
+    {
+      "plan_id": "P-K-shop-api-steady-memory-1152Mi",
+      "decision_id": "K-shop-api-steady-memory",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "memory": "2048Mi"
+        },
+        "limits": {
+          "memory": "3072Mi"
+        },
+        "replicas": 3
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "api-steady",
+                  "resources": {
+                    "requests": {
+                      "memory": "1152Mi"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy api-steady --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"api-steady\", \"resources\": {\"requests\": {\"memory\": \"1152Mi\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy api-steady --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"api-steady\", \"resources\": {\"requests\": {\"memory\": \"2048Mi\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-api-steady-memory-1152Mi.approved"
+    },
+    {
+      "plan_id": "P-K-shop-burning-slo-cpu-150m",
+      "decision_id": "K-shop-burning-slo-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "1000m"
+        },
+        "limits": {
+          "cpu": "2000m"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "burning-slo",
+                  "resources": {
+                    "requests": {
+                      "cpu": "150m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy burning-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"burning-slo\", \"resources\": {\"requests\": {\"cpu\": \"150m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy burning-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"burning-slo\", \"resources\": {\"requests\": {\"cpu\": \"1000m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-burning-slo-cpu-150m.approved"
+    },
+    {
+      "plan_id": "P-K-shop-burning-slo-memory-768Mi",
+      "decision_id": "K-shop-burning-slo-memory",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "memory": "2048Mi"
+        },
+        "limits": {
+          "memory": "3072Mi"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "burning-slo",
+                  "resources": {
+                    "requests": {
+                      "memory": "768Mi"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy burning-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"burning-slo\", \"resources\": {\"requests\": {\"memory\": \"768Mi\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy burning-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"burning-slo\", \"resources\": {\"requests\": {\"memory\": \"2048Mi\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-burning-slo-memory-768Mi.approved"
+    },
+    {
+      "plan_id": "P-K-shop-hpa-managed-cpu-450m",
+      "decision_id": "K-shop-hpa-managed-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "1000m"
+        },
+        "limits": {
+          "cpu": "2000m"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "hpa-managed",
+                  "resources": {
+                    "requests": {
+                      "cpu": "450m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy hpa-managed --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"hpa-managed\", \"resources\": {\"requests\": {\"cpu\": \"450m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy hpa-managed --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"hpa-managed\", \"resources\": {\"requests\": {\"cpu\": \"1000m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-hpa-managed-cpu-450m.approved"
+    },
+    {
+      "plan_id": "P-K-shop-hpa-managed-memory-1152Mi",
+      "decision_id": "K-shop-hpa-managed-memory",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "memory": "2048Mi"
+        },
+        "limits": {
+          "memory": "3072Mi"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "hpa-managed",
+                  "resources": {
+                    "requests": {
+                      "memory": "1152Mi"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy hpa-managed --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"hpa-managed\", \"resources\": {\"requests\": {\"memory\": \"1152Mi\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy hpa-managed --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"hpa-managed\", \"resources\": {\"requests\": {\"memory\": \"2048Mi\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-hpa-managed-memory-1152Mi.approved"
+    },
+    {
+      "plan_id": "P-K-shop-mem-near-oom-cpu-100m",
+      "decision_id": "K-shop-mem-near-oom-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "500m"
+        },
+        "limits": {
+          "cpu": "1000m"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "mem-near-oom",
+                  "resources": {
+                    "requests": {
+                      "cpu": "100m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy mem-near-oom --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"mem-near-oom\", \"resources\": {\"requests\": {\"cpu\": \"100m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy mem-near-oom --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"mem-near-oom\", \"resources\": {\"requests\": {\"cpu\": \"500m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-mem-near-oom-cpu-100m.approved"
+    },
+    {
+      "plan_id": "P-K-shop-packing-trap-cpu-200m",
+      "decision_id": "K-shop-packing-trap-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "1000m"
+        },
+        "limits": {
+          "cpu": "2000m"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "packing-trap",
+                  "resources": {
+                    "requests": {
+                      "cpu": "200m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n shop patch deploy packing-trap --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"packing-trap\", \"resources\": {\"requests\": {\"cpu\": \"200m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n shop patch deploy packing-trap --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"packing-trap\", \"resources\": {\"requests\": {\"cpu\": \"1000m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-shop-packing-trap-cpu-200m.approved"
+    },
+    {
+      "plan_id": "P-K-tools-no-slo-cpu-200m",
+      "decision_id": "K-tools-no-slo-cpu",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "cpu": "1000m"
+        },
+        "limits": {
+          "cpu": "2000m"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "no-slo",
+                  "resources": {
+                    "requests": {
+                      "cpu": "200m"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n tools patch deploy no-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"no-slo\", \"resources\": {\"requests\": {\"cpu\": \"200m\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n tools patch deploy no-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"no-slo\", \"resources\": {\"requests\": {\"cpu\": \"1000m\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-tools-no-slo-cpu-200m.approved"
+    },
+    {
+      "plan_id": "P-K-tools-no-slo-memory-1024Mi",
+      "decision_id": "K-tools-no-slo-memory",
+      "context": "k3d-finops-test",
+      "before": {
+        "requests": {
+          "memory": "2048Mi"
+        },
+        "limits": {
+          "memory": "3072Mi"
+        },
+        "replicas": 2
+      },
+      "patch": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "name": "no-slo",
+                  "resources": {
+                    "requests": {
+                      "memory": "1024Mi"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "apply_cmd": "kubectl --context k3d-finops-test -n tools patch deploy no-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"no-slo\", \"resources\": {\"requests\": {\"memory\": \"1024Mi\"}}}]}}}}'",
+      "rollback_cmd": "kubectl --context k3d-finops-test -n tools patch deploy no-slo --type strategic -p '{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"no-slo\", \"resources\": {\"requests\": {\"memory\": \"2048Mi\"}}}]}}}}'",
+      "canary": {
+        "scope": "one workload"
+      },
+      "observe_seconds": 120,
+      "stop_conditions": [
+        {
+          "signal": "throttle_ratio",
+          "op": ">",
+          "value": 0.05
+        },
+        {
+          "signal": "p99_seconds",
+          "op": ">",
+          "value": 0.2
+        },
+        {
+          "signal": "oom_killed",
+          "op": ">",
+          "value": 0
+        },
+        {
+          "signal": "restarts",
+          "op": ">",
+          "value": 0
+        }
+      ],
+      "approval_file": "runs/approvals/P-K-tools-no-slo-memory-1024Mi.approved"
+    }
+  ]
+}
