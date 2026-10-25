@@ -44,6 +44,76 @@ BLOCKED = [
     "aws 'unterminated",
 ]
 
+CTX = "--context k3d-finops-test"
+INTENT = "# INTENT: canary one workload, observed over-provisioning, expect lower request\n"
+
+K8S_ALLOWED = [
+    "kubectl get pods -n shop",
+    "kubectl --context k3d-cre6630 get pods",  # reads are not restricted
+    "kubectl describe deploy api-steady",
+    "kubectl top pod",
+    "kubectl logs deploy/api-steady -n shop",
+    "kubectl rollout status deploy/api-steady",
+    "kubectl version",
+    "kubectl config view",
+    "kubectl config get-contexts",
+    "kubectl config current-context",
+    "kubectl api-resources",
+    "kubectl auth can-i get pods",
+    "kubectl wait --for=condition=Available deploy/api-steady",
+    "kubectl get --raw /api/v1/namespaces/shop/services/api-steady:8080/proxy/metrics",
+    "/opt/homebrew/bin/kubectl --context=k3d-cre6630 get nodes | head",
+    "ls ops/k3d/",
+    "git commit -m 'kubectl delete is blocked by the hook'",
+    INTENT + f"kubectl {CTX} -n shop patch deploy api-steady --type strategic -p '{{}}'",
+    INTENT + "kubectl --context=k3d-finops-test apply -f ops/k3d/shop.yaml",
+    INTENT + f"kubectl {CTX} scale deploy api-steady --replicas=2",
+    INTENT + f"kubectl {CTX} rollout restart deploy/api-steady",
+    INTENT + f"kubectl {CTX} rollout undo deploy/api-steady",
+    INTENT + f"kubectl {CTX} delete pod x",
+    "# INTENT: a; b && c | d\n" + f"kubectl {CTX} label ns shop a=b",
+    "k3d cluster create finops-test --servers 1 --agents 0",
+    "k3d cluster delete finops-test",
+    "k3d cluster list",
+    "k3d cluster start finops-test",
+    "k3d cluster stop finops-test",
+    "k3d kubeconfig get finops-test",
+    "k3d version",
+    "k3d image import -c finops-test app:latest",
+]
+
+K8S_BLOCKED = [
+    INTENT + "kubectl --context k3d-cre6630 delete pod x",
+    INTENT + "kubectl --context=k3d-cre6630 patch deploy x -p '{}'",
+    INTENT + "kubectl -n shop patch deploy x -p '{}'",  # missing context
+    INTENT + "kubectl delete pod x",  # missing context
+    f"kubectl {CTX} patch deploy x -p '{{}}'",  # missing INTENT
+    f"kubectl {CTX} apply -f x.yaml",
+    f"kubectl {CTX} rollout undo deploy/x",
+    "kubectl --context k3d-finops-test delete ns shop # INTENT: after the command does not count",
+    INTENT + f"kubectl {CTX} get pods; kubectl delete pod x",  # second command lacks context
+    INTENT + f"kubectl {CTX} exec -it pod -- sh",  # unknown verb
+    INTENT + f"kubectl {CTX} port-forward pod 80:80",
+    INTENT + f"kubectl {CTX} config use-context k3d-cre6630",
+    INTENT + f"kubectl {CTX} drain n1 | kubectl delete node n1",
+    "bash -c 'kubectl delete pod x'",
+    "eval kubectl delete pod x",
+    "echo pod | xargs kubectl delete pod",
+    "$(echo kubectl) delete pod x",
+    "kubectl 'unterminated",
+    "k3d cluster delete cre6630",
+    "k3d cluster delete",
+    "k3d cluster delete --all",
+    "k3d cluster stop cre6630",
+    "k3d cluster start cre6630 finops-test",
+    "k3d cluster create other",
+    "k3d kubeconfig merge cre6630",
+    "k3d kubeconfig get --all",
+    "k3d cluster list cre6630",
+    "k3d node delete x",
+    "k3d image import -c cre6630 app:latest",
+]
+
 
 class GuardTest(unittest.TestCase):
     def test_allowed(self):
@@ -55,6 +125,27 @@ class GuardTest(unittest.TestCase):
         for cmd in BLOCKED:
             with self.subTest(cmd=cmd):
                 self.assertIsNotNone(check(cmd))
+
+    def test_k8s_allowed(self):
+        for cmd in K8S_ALLOWED:
+            with self.subTest(cmd=cmd):
+                self.assertIsNone(check(cmd))
+
+    def test_k8s_blocked(self):
+        for cmd in K8S_BLOCKED:
+            with self.subTest(cmd=cmd):
+                self.assertIsNotNone(check(cmd))
+
+    def test_hook_protocol_k8s(self):
+        def run(cmd):
+            payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}})
+            return subprocess.run([sys.executable, str(HOOK)], input=payload, capture_output=True, text=True)
+
+        self.assertEqual(run("kubectl get pods").returncode, 0)
+        r = run("kubectl --context k3d-cre6630 delete pod x")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("k3d-finops-test", r.stderr)
+        self.assertEqual(run(INTENT + f"kubectl {CTX} delete pod x").returncode, 0)
 
     def test_hook_protocol(self):
         def run(cmd, tool="Bash"):
