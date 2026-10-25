@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0034-k8s-loop</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0034-k8s-loop</h1>
+</header>
+<h1
+id="c0034-k8s-loop把执行台账流水线报告接成一条线">c0034-k8s-loop：把执行、台账、流水线、报告接成一条线</h1>
+<h2 id="改了什么">改了什么</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>缺口</th>
+<th>改动</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>执行不更新台账</td>
+<td><code>act.py</code> 每个结局后回写
+<code>runs/k8s_state.json</code>：proposed → approved → applied →
+verified 或 rolled_back；refused 不动；failed 停在 applied</td>
+</tr>
+<tr>
+<td>流水线不出报告</td>
+<td><code>k8s run</code> 同时写
+<code>k8s_daily.html</code>、<code>k8s_weekly.html</code>、<code>k8s_monthly.html</code>；新增
+<code>--prev-run</code>、<code>--score</code>；新增
+<code>k8s ledger</code> 打印台账</td>
+</tr>
+<tr>
+<td>报告读的是猜的形状</td>
+<td>台账读 <code>status</code>；考卷读
+<code>k8s_eval.json</code>；计划是
+<code>{run_id, as_of, safe_halt, plans[]}</code>；叙述是对象，在「结论」里标「由模型撰写、数字已核对」，<code>would_change</code>
+显示为「什么情况下判定会变」</td>
+</tr>
+<tr>
+<td>报告打磨</td>
+<td>证据表带「含义」列（E8 有效天数、E9
+覆盖率）；无值、无关的证据行不显示；「做完应该是什么样」第一句说钱动不动、为什么</td>
+</tr>
+<tr>
+<td>demo 用手写计划</td>
+<td>demo 用 <code>k8s run</code> 对合成世界生成的计划，demo
+清单与世界里的 api-steady
+一致；展示拒绝、回滚、verified、台账流转，最后渲染含真实 actions
+的周报</td>
+</tr>
+<tr>
+<td>样例报告是夹具</td>
+<td>样例由真实运行生成（day1/day2、真实台账、真实 demo actions、k8s-eval
+的考卷）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="人工-gate-与回滚">人工 gate 与回滚</h2>
+<p>改集群的唯一入口仍是
+<code>act.py</code>：审批文件由人创建；上下文只能是
+<code>k3d-finops-test</code>；漂移就拒绝；停止条件命中自动回滚。台账只记录结局，不触发动作。回滚本
+change 即 revert 这几个 commit。</p>
+<h2 id="停止条件的诚实边界">停止条件的诚实边界</h2>
+<p>计划只降 request，CFS throttle 由 limit 决定，所以 throttle 条件在
+demo 里没有被测到。回滚由 <code>p99_seconds &gt; SLO</code>
+触发，靠观察期内注入过载；它证明守卫在退化时会触发并回滚到变更前，不证明降
+request 导致了退化。</p>
+<h2 id="验收">验收</h2>
+<ul>
+<li><code>make k8s-eval</code>：verdict_accuracy 1.0，unsafe_allow 0（与
+c0031 相同）</li>
+<li><code>make k8s-days</code>、<code>make eval</code>、<code>python3 tools/check_rules.py --docs</code>
+通过</li>
+<li>单测：finops_agent 317 条、eval 44 条、testenv 62 条、hooks 6
+条全部通过；<code>make test</code> 唯一失败是已知的
+<code>reports/index.html</code> 缺行</li>
+<li><code>make k8s-demo</code> 全新集群端到端：两次拒绝，memory
+计划在过载下 p99 0.7506 触发回滚（台账 applied → rolled_back），cpu
+计划在正常负载下 verified（台账 applied → verified），周报显示真实
+actions</li>
+</ul>
+<p>下面是逐项原始输出。</p>
+<p>验收口径见 tasks.md 第 5
+节。下面的输出都是在本分支上实际跑出来的，只删去了重复的
+<code>Waiting for deployment</code> 轮询行和观察期里中间的几次采样。</p>
+<h2 id="证据-1.-单测">证据 1. 单测</h2>
+<pre><code>$ python3 -m unittest finops_agent.k8s.test_act.LedgerTest finops_agent.k8s.test_demo_manifest -v
+test_verified_moves_ledger_through_approved_applied_verified ... ok   （台账 proposed → approved → applied → verified）
+test_rollback_moves_ledger_to_rolled_back ... ok                       （… → applied → rolled_back）
+test_refused_leaves_ledger_alone ... ok                                （refused 不动状态，记录里没有 ledger 字段）
+test_failed_after_apply_stays_applied ... ok                           （回滚没恢复：停在 applied，交给人）
+test_missing_proposal_does_not_change_outcome ... ok                   （台账写不进去只在 ledger 字段说明，不改执行结果）
+test_no_state_given_is_reported_not_fatal ... ok
+test_cli_default_state_is_under_root ... ok
+test_drift_only_on_touched_resources ... ok                            （漂移闸门只比较计划涉及的资源）
+test_manifest_equals_the_worlds_api_steady ... ok                      （demo 清单 == 合成世界的 api-steady）
+test_generated_plans_match_the_manifest_without_adaptation ... ok
+test_adapt_plan_is_silent_when_equal ... ok
+test_adapt_plan_is_loud_and_restores_the_demos_own_value ... ok
+Ran 12 tests in 0.109s
+OK</code></pre>
+<pre><code>$ python3 -W ignore -m unittest discover -t . -s finops_agent -p &#39;test_*.py&#39;   （含 test_report 28 条、test_pipeline 9 条）
+  P-F03 [commands] reversal=medium $3.60/mo  idle_public_ip
+  P-F06 [commands] reversal=low $20.00/mo  gp2_to_gp3
+  P-F07 [advice_only] reversal=high $0.00/mo  savings_plan_underutilized
+
+$ python3 -W ignore -m unittest discover -t . -s eval -p &#39;test_*.py&#39;      Ran 44 tests ... OK
+$ python3 -W ignore -m unittest discover -t . -s testenv -p &#39;test_*.py&#39;   Ran 62 tests ... OK
+$ python3 -m unittest discover -s hooks -p &#39;test_*.py&#39;                    Ran 6 tests ... OK</code></pre>
+<p><code>make test</code> 整体退出码为
+2，唯一失败是已知例外：<code>tools/test_build_index.py</code> 的
+<code>test_index_lists_every_change</code> 报
+<code>c0034-k8s-loop missing from index</code>（<code>reports/index.html</code>
+缺本 change 的行，按任务要求不提交该文件；<code>make test</code>
+在这一步中断，所以后面三个 discover 是手动分别跑的，结果如上）。</p>
+<h2 id="证据-2.-make-k8s-eval数字不变">证据 2. make
+k8s-eval（数字不变）</h2>
+<pre><code>$ make k8s-eval
+runs/k8s-local/k8s_decisions.json
+{&quot;verdict_accuracy&quot;: 1.0, &quot;unsafe_allow&quot;: 0, &quot;unknown_recall&quot;: 1.0, &quot;request_in_range&quot;: 1.0, &quot;realizable_accuracy&quot;: 1.0}
+n={&#39;expected&#39;: 18, &#39;decisions&#39;: 18, &#39;unknown_expected&#39;: 2, &#39;ranged&#39;: 8, &#39;realizable&#39;: 2} narrative={&#39;llm&#39;: 18}
+gates: pass</code></pre>
+<p>verdict_accuracy 1.0、unsafe_allow 0、unknown_recall
+1.0、request_in_range 1.0、realizable_accuracy 1.0，与 c0031
+相同。证据标签放在 report.py，没有动
+collect.py：证据条目会进叙述提示词，加字段会让 cassette 失效。</p>
+<h2 id="证据-3.-make-k8s-daysmake-evalcheck_rules">证据 3. make
+k8s-days、make eval、check_rules</h2>
+<pre><code>$ make k8s-days
+bash scripts/k8s_days.sh
+== k8s-day1 (day 1, base world, as_of 2026-10-25T00:00:00Z) ==
+   new=10  unchanged=0  expired=0   plans=10  verdicts={&#39;ALLOW&#39;: 7, &#39;DENY&#39;: 4, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}
+   new       shop/api-steady/cpu            ALLOW，目标 0.25 core
+   new       shop/api-steady/memory         ALLOW，目标 1.125 GiB
+   new       shop/burning-slo/cpu           ALLOW，目标 0.15 core
+   new       shop/burning-slo/memory        ALLOW，目标 0.75 GiB
+   new       shop/hpa-managed/cpu           REQUIRE_APPROVAL，目标 0.45 core
+   new       shop/hpa-managed/memory        ALLOW，目标 1.125 GiB
+   new       shop/mem-near-oom/cpu          ALLOW，目标 0.1 core
+   new       shop/packing-trap/cpu          ALLOW，目标 0.2 core
+   new       tools/no-slo/cpu               REQUIRE_APPROVAL，目标 0.2 core
+   new       tools/no-slo/memory            REQUIRE_APPROVAL，目标 1 GiB
+== k8s-day2 (day 2, base world, one day later, as_of 2026-10-26T00:00:00Z) ==
+   new=0  unchanged=8  expired=2   plans=8  verdicts={&#39;ALLOW&#39;: 5, &#39;DENY&#39;: 6, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}
+   expired   shop/burning-slo/cpu           本轮 verdict 为 DENY，不再是可提案
+   expired   shop/burning-slo/memory        本轮 verdict 为 DENY，不再是可提案
+== k8s-day3 (day 3, drift_day3: api-steady load +60%, as_of 2026-10-28T00:00:00Z) ==
+   new=1  unchanged=7  expired=1   plans=8  verdicts={&#39;ALLOW&#39;: 5, &#39;DENY&#39;: 6, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}
+   expired   shop/api-steady/cpu            目标值变化超过容差：ALLOW 0.25 -&gt; ALLOW 0.35
+   new       shop/api-steady/cpu            ALLOW，目标 0.35 core
+== api-steady/cpu: ledger history ==
+   P-K-shop-api-steady-cpu-0.25       expired   first_seen 2026-10-25T00:00:00Z  last_seen 2026-10-26T00:00:00Z
+      k8s-day1  proposed  ALLOW，目标 0.25 core
+      k8s-day3  expired   目标值变化超过容差：ALLOW 0.25 -&gt; ALLOW 0.35
+   P-K-shop-api-steady-cpu-0.35       proposed  first_seen 2026-10-28T00:00:00Z  last_seen 2026-10-28T00:00:00Z
+      k8s-day3  proposed  ALLOW，目标 0.35 core</code></pre>
+<pre><code>$ make eval
+{&quot;recall&quot;: 1.0, &quot;savings_recall&quot;: 1.0, &quot;precision&quot;: 1.0, &quot;savings_accuracy&quot;: 0.9167, &quot;step_agreement&quot;: 1.0, &quot;depth&quot;: {&quot;shallow_recall&quot;: 1.0, &quot;deep_recall&quot;: 1.0}, &quot;leads&quot;: 7}
+missed: 
+gates: pass
+$ python3 tools/check_rules.py --docs
+check_rules: OK</code></pre>
+<h2 id="证据-4.-make-k8s-demo全新集群端到端仅-finops-test">证据 4. make
+k8s-demo：全新集群，端到端（仅 finops-test）</h2>
+<p>先 <code>make k8s-down</code> 删掉旧集群，再
+<code>make k8s-demo</code> 从零创建，总耗时 3 分 48 秒。以下是
+<code>runs/k8s-demo/demo.log</code> 的关键部分。</p>
+<h3 id="流水线生成计划demo-清单与合成世界一致不需要改写-before">4.1
+流水线生成计划，demo 清单与合成世界一致，不需要改写 before</h3>
+<pre><code>=== [3] k8s run against the synthetic metrics server: decisions, plans, ledger, three reports
+k8s run k8s-demo (as_of 2026-10-26T00:00:00Z): 18 decisions {&#39;ALLOW&#39;: 5, &#39;DENY&#39;: 6, &#39;NOOP&#39;: 2, &#39;REQUIRE_APPROVAL&#39;: 3, &#39;UNKNOWN&#39;: 2}, plans 8, ledger {&#39;new&#39;: 8, &#39;unchanged&#39;: 0, &#39;expired&#39;: 0, &#39;halted&#39;: 0, &#39;approved&#39;: 0, &#39;suppressed&#39;
+runs/k8s-demo/k8s_decisions.json
+generated plans for shop/api-steady (verdict ALLOW both): P-K-shop-api-steady-cpu-0.25  P-K-shop-api-steady-memory-1.125
+  K-shop-api-steady-cpu: ALLOW  1 -&gt; 0.25 core
+  K-shop-api-steady-memory: ALLOW  2 -&gt; 1.125 GiB
+check: does the demo deployment equal what the plans assumed?
+P-K-shop-api-steady-cpu-0.25: demo deployment == synthetic world for [&#39;cpu&#39;] and replicas, no adaptation needed
+P-K-shop-api-steady-memory-1.125: demo deployment == synthetic world for [&#39;memory&#39;] and replicas, no adaptation needed
+--- ledger after the run (nothing is approved yet)
+ledger: 8 proposals, safe_halt=off
+  proposed    P-K-shop-api-steady-cpu-0.25           proposed
+  proposed    P-K-shop-api-steady-memory-1.125       proposed
+  proposed    P-K-shop-hpa-managed-cpu-0.45          proposed
+  proposed    P-K-shop-hpa-managed-memory-1.125      proposed
+  proposed    P-K-shop-mem-near-oom-cpu-0.1          proposed
+  proposed    P-K-shop-packing-trap-cpu-0.2          proposed
+  proposed    P-K-tools-no-slo-cpu-0.2               proposed
+  proposed    P-K-tools-no-slo-memory-1              proposed</code></pre>
+<h3 id="两次拒绝集群和台账都没动">4.2 两次拒绝，集群和台账都没动</h3>
+<pre><code>=== [4] refusal 1: no approval file
+[act 17:10:58] outcome=refused reason=approval file missing: runs/approvals/P-K-shop-api-steady-cpu-0.25.approved
+exit=3 (3 = refused)
+
+=== [5] refusal 2: wrong context (copy of the plan edited)
+[act 17:10:58] outcome=refused reason=context &#39;k3d-wrong-context&#39; != k3d-finops-test
+exit=3 (3 = refused)
+resources unchanged: {&quot;limits&quot;:{&quot;cpu&quot;:&quot;2&quot;,&quot;memory&quot;:&quot;3Gi&quot;},&quot;requests&quot;:{&quot;cpu&quot;:&quot;1&quot;,&quot;memory&quot;:&quot;2Gi&quot;}}
+--- ledger unchanged by refusals
+ledger: 8 proposals, safe_halt=off
+  proposed    P-K-shop-api-steady-cpu-0.25           proposed
+  proposed    P-K-shop-api-steady-memory-1.125       proposed
+  proposed    P-K-shop-hpa-managed-cpu-0.45          proposed
+  proposed    P-K-shop-hpa-managed-memory-1.125      proposed
+  proposed    P-K-shop-mem-near-oom-cpu-0.1          proposed
+  proposed    P-K-shop-packing-trap-cpu-0.2          proposed
+  proposed    P-K-tools-no-slo-cpu-0.2               proposed
+  proposed    P-K-tools-no-slo-memory-1              proposed</code></pre>
+<h3
+id="过载时执行-memory-计划p99-超过-slo自动回滚台账-applied-rolled_back">4.3
+过载时执行 memory 计划：p99 超过 SLO，自动回滚，台账 applied →
+rolled_back</h3>
+<pre><code>=== [7] overload the service during the canary (2 load generators x 200 rps), apply the MEMORY plan: expect stop condition p99 and rollback
+note: the plans only lower REQUESTS. A lower request does not slow this service down on an idle node (and CPU throttling comes from the
+      LIMIT, which no plan changes, so the throttle stop condition stays quiet). The guard that fires is p99 &gt; SLO: any regression inside
+      the canary window rolls the change back, whatever caused it. The overload is injected to show that; it is not caused by the lower request.
+# INTENT: set loadgen to 200 rps x 2 generators to drive the canary
+deployment.apps/loadgen env updated
+# INTENT: run 2 load generator(s)
+deployment.apps/loadgen scaled
+deployment &quot;loadgen&quot; successfully rolled out
+metrics under overload before patch: http_request_duration_p99_seconds 0.7434 cpu_throttle_ratio 0.0000 http_requests_total 1042 container_cpu_cfs_periods_total 168 container_cpu_cfs_throttled_periods_total 0 
+[act 17:11:22] gates passed for P-K-shop-api-steady-memory-1.125; applying
+[act 17:11:22] ledger P-K-shop-api-steady-memory-1.125 -&gt; applied
+[act 17:11:22] outcome=applied reason=patch applied, observing
+[act 17:11:25] observe {&#39;p99_seconds&#39;: 0.0883, &#39;restarts&#39;: 0, &#39;oom_killed&#39;: 0}
+[act 17:11:31] observe {&#39;p99_seconds&#39;: 0.7506, &#39;restarts&#39;: 0, &#39;oom_killed&#39;: 0}
+[act 17:11:31] STOP condition hit: {&#39;signal&#39;: &#39;p99_seconds&#39;, &#39;op&#39;: &#39;&gt;&#39;, &#39;value&#39;: 0.3, &#39;observed&#39;: 0.7506}; rolling back
+[act 17:11:36] ledger P-K-shop-api-steady-memory-1.125 -&gt; rolled_back
+[act 17:11:36] outcome=rolled_back reason=stop condition p99_seconds &gt; 0.3 (observed 0.7506); resources verified equal to before
+exit=4 (4 = rolled_back)
+resources after rollback: {&quot;limits&quot;:{&quot;cpu&quot;:&quot;2&quot;,&quot;memory&quot;:&quot;3Gi&quot;},&quot;requests&quot;:{&quot;cpu&quot;:&quot;1&quot;,&quot;memory&quot;:&quot;2Gi&quot;}}
+--- ledger
+ledger: 8 proposals, safe_halt=off
+  proposed    P-K-shop-api-steady-cpu-0.25           proposed
+  rolled_back P-K-shop-api-steady-memory-1.125       proposed -&gt; approved -&gt; applied -&gt; rolled_back
+  proposed    P-K-shop-hpa-managed-cpu-0.45          proposed
+  proposed    P-K-shop-hpa-managed-memory-1.125      proposed
+  proposed    P-K-shop-mem-near-oom-cpu-0.1          proposed
+  proposed    P-K-shop-packing-trap-cpu-0.2          proposed
+  proposed    P-K-tools-no-slo-cpu-0.2               proposed
+  proposed    P-K-tools-no-slo-memory-1              proposed</code></pre>
+<h3
+id="恢复正常负载后执行-cpu-计划观察-120-秒无停止条件台账-applied-verified">4.4
+恢复正常负载后执行 cpu 计划：观察 120 秒无停止条件，台账 applied →
+verified</h3>
+<pre><code>=== [8] back to normal load (5 rps), apply the CPU plan: expect verified
+# INTENT: set loadgen to 5 rps x 1 generators to drive the canary
+deployment.apps/loadgen env updated
+# INTENT: run 1 load generator(s)
+deployment.apps/loadgen scaled
+deployment &quot;loadgen&quot; successfully rolled out
+[act 17:12:00] gates passed for P-K-shop-api-steady-cpu-0.25; applying
+[act 17:12:01] ledger P-K-shop-api-steady-cpu-0.25 -&gt; applied
+[act 17:12:01] outcome=applied reason=patch applied, observing
+[act 17:12:06] observe {&#39;throttle_ratio&#39;: 0.0, &#39;p99_seconds&#39;: 0.0121, &#39;restarts&#39;: 0, &#39;oom_killed&#39;: 0}
+[act 17:12:11] observe {&#39;throttle_ratio&#39;: 0.0, &#39;p99_seconds&#39;: 0.0121, &#39;restarts&#39;: 0, &#39;oom_killed&#39;: 0}
+[act 17:12:16] observe {&#39;throttle_ratio&#39;: 0.0, &#39;p99_seconds&#39;: 0.0134, &#39;restarts&#39;: 0, &#39;oom_killed&#39;: 0}
+[act 17:14:09] ledger P-K-shop-api-steady-cpu-0.25 -&gt; verified
+[act 17:14:09] outcome=verified reason=observed 120s without a stop condition; live resources match the patch
+exit=0 (0 = verified)
+resources after canary: {&quot;limits&quot;:{&quot;cpu&quot;:&quot;2&quot;,&quot;memory&quot;:&quot;3Gi&quot;},&quot;requests&quot;:{&quot;cpu&quot;:&quot;250m&quot;,&quot;memory&quot;:&quot;2Gi&quot;}}
+final metrics: http_request_duration_p99_seconds 0.0199 cpu_throttle_ratio 0.0000 http_requests_total 210 container_cpu_cfs_periods_total 563 container_cpu_cfs_throttled_periods_total 0</code></pre>
+<h3 id="台账与执行记录">4.5 台账与执行记录</h3>
+<pre><code>=== [9] ledger: the proposals that moved, and the actions
+ledger: 8 proposals, safe_halt=off
+  verified    P-K-shop-api-steady-cpu-0.25           proposed -&gt; approved -&gt; applied -&gt; verified
+  rolled_back P-K-shop-api-steady-memory-1.125       proposed -&gt; approved -&gt; applied -&gt; rolled_back
+--- k8s_actions.jsonl (time, outcome, ledger, reason)
+2026-10-25T17:10:58+00:00  P-K-shop-api-steady-cpu-0.25       refused     ledger=-           approval file missing: runs/approvals/P-K-shop-api-steady-cpu-0.25.approved
+2026-10-25T17:10:58+00:00  P-K-shop-api-steady-cpu-0.25       refused     ledger=-           context &#39;k3d-wrong-context&#39; != k3d-finops-test
+2026-10-25T17:11:22+00:00  P-K-shop-api-steady-memory-1.125   applied     ledger=applied     patch applied, observing
+2026-10-25T17:11:36+00:00  P-K-shop-api-steady-memory-1.125   rolled_back ledger=rolled_back stop condition p99_seconds &gt; 0.3 (observed 0.7506); resources verified equal to 
+2026-10-25T17:12:00+00:00  P-K-shop-api-steady-cpu-0.25       applied     ledger=applied     patch applied, observing
+2026-10-25T17:14:09+00:00  P-K-shop-api-steady-cpu-0.25       verified    ledger=verified    observed 120s without a stop condition; live resources match the patch
+
+=== [10] render the reports again, now with the real k8s_actions.jsonl
+wrote runs/k8s-demo/k8s_daily.html runs/k8s-demo/k8s_weekly.html runs/k8s-demo/k8s_monthly.html</code></pre>
+<h3 id="结果">4.6 结果</h3>
+<pre><code>=== [11] summary
+DEMO OK: refusals, rollback and verified path all behaved; the ledger followed</code></pre>
+<p><code>make k8s-down</code> 之后 <code>k3d cluster list</code> 只剩
+<code>cre6630</code>（本 change 没有碰它，它处于停止状态）。</p>
+<h2 id="证据-5.-样例报告">证据 5. 样例报告</h2>
+<p><code>bash scripts/k8s_report_samples.sh</code> 重新生成
+<code>reports/k8s-sample/{daily,weekly,monthly}.html</code>，三个文件均不含本机绝对路径（对本机路径前缀的
+grep 计数为 0）： - 日报：真实运行的 day2 对 day1，台账是 k8s-days
+前两天的台账； - 周报：day2 决策 + 上面这次 demo 的真实
+<code>k8s_actions.jsonl</code> 与台账（拷进
+<code>finops_agent/k8s/fixtures/demo/</code>，可复现）； - 月报：加上
+<code>make k8s-eval</code> 同口径的考卷分数（<code>eval.score_k8s</code>
+对 day2 的输出）。 - t6 的 <code>k8s_verify.json</code>
+不在本分支。周报与月报里的「核实结果」仍用
+<code>fixtures/day2/k8s_verify.json</code>，那是手写夹具；每一行带
+<code>note</code>，报告会把「手写夹具，不是真实核实结果」显示在核实表下面。
+- 周报里的台账状态与执行记录一致：cpu 计划 已提案 → 已批准 → 已应用 →
+已核实，memory 计划 → … → 已回滚；两次被闸门拦下的尝试单独列出。</p>
+<h2 id="证据-6.-停止条件诚实的边界">证据 6. 停止条件：诚实的边界</h2>
+<ul>
+<li>计划只降 request。CFS throttle 由 limit 决定，demo 里
+<code>throttle_ratio</code> 全程 0，所以 throttle
+这个停止条件没有被测到，计划里保留它。</li>
+<li>回滚由 <code>p99_seconds &gt; 0.3</code> 触发（SLO 目录里 api-steady
+的 p99 目标）。在空闲机器上，单独降 request 并不会让延迟变差；demo
+的回滚路径靠的是观察期内注入过载（2 个压测器 × 200
+rps），证明的是「守卫在退化时触发并回滚到变更前」，不是「降 request
+导致退化」。</li>
+<li>为了让过载如实反映在 p99 上，<code>ops/k3d/app.py</code> 改成单
+worker（一次处理一个请求，其他的在锁上排队，延迟从排队前开始计）。之前的版本在
+GIL 下接不进去的连接堵在内核 backlog 里，p99 在 saturation 下也只有 0.07
+秒。第一次 demo（尚未改 app）两条计划都走了
+verified，没有触发回滚，这就是改 app 的原因。</li>
+</ul>
+</body>
+</html>
