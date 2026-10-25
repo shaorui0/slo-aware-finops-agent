@@ -1,0 +1,1 @@
+{"query": "sum(increase(http_requests_total[30d]))", "requests_total": 182000000, "window_days": 30, "cluster_cost_usd": 840.96}
