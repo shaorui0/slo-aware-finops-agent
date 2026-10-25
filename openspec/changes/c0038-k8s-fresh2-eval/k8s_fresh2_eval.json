@@ -1,0 +1,43 @@
+{
+  "verdict_accuracy": 0.9167,
+  "unsafe_allow": 0,
+  "unknown_recall": 0.0,
+  "request_in_range": 0.9444,
+  "realizable_accuracy": null,
+  "n": {
+    "expected": 24,
+    "decisions": 22,
+    "unknown_expected": 2,
+    "ranged": 18,
+    "realizable": 0
+  },
+  "wrong_verdicts": [
+    {
+      "id": "edge-collector/cpu",
+      "got": null,
+      "expect": "UNKNOWN"
+    },
+    {
+      "id": "edge-collector/memory",
+      "got": null,
+      "expect": "UNKNOWN"
+    }
+  ],
+  "unsafe_allow_ids": [],
+  "out_of_range": [
+    {
+      "id": "session-cache/memory",
+      "request": 3.25,
+      "range": [
+        5.4,
+        6.2
+      ]
+    }
+  ],
+  "realizable_misses": [],
+  "not_in_world": [],
+  "narrative_ungrounded": [],
+  "narrative_sources": {
+    "llm": 22
+  }
+}

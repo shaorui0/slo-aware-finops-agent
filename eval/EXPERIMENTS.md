@@ -440,7 +440,7 @@ n=20 个 (workload, resource)；verdict_accuracy 18/20 的 Wilson 95% 区间约 
 - **真实集群上的失败率。** 合成数据没有真实世界的噪声与形状；
 - **录制的稳定性。** 每条叙述只录了一次。
 
-### 8.5 修复后在第一个预注册世界上重跑（已污染，不能当成泛化证据）
+### 8.7 修复后在第一个预注册世界上重跑（c0037，已污染，不能当成泛化证据）
 
 c0037 按 §8.4 修了 agent 一侧的三类缺陷：条件 B 的趋势子项、用量选择器按容器过滤、`--nodes-from` 读取世界的 `pricing`。第一个预注册世界（`k8s_fresh_world.yaml`）的失败驱动了这次修复，所以它对这三类问题**已经被污染**：下面的数字证明修复生效，不证明泛化。泛化要靠一个在修复之前冻结、修复之后才评估一次的新世界。`bash eval/k8s_heldout.sh` 复现（record 一次，之后回放；原始输出：`openspec/changes/c0037-k8s-fix-heldout-misses/` 下的 `eval_record_output.txt`、`k8s_fresh_decisions.json`、`k8s_fresh_eval.json`）。
 
@@ -471,3 +471,63 @@ c0037 按 §8.4 修了 agent 一侧的三类缺陷：条件 B 的趋势子项、
 - 趋势守卫的阈值（14 天外推、R² ≥ 0.6、涨幅 ≥ 10%）是读着这个世界的失败设的，而不是独立标定的。两个世界里的序列要么是线性爬升、要么是平稳，没有测过 R² 在阈值附近的灰色地带，不知道阈值在中间地带的行为；
 - 趋势守卫只对内存启用（配置可开 cpu），理由见 `openspec/changes/c0037-k8s-fix-heldout-misses/proposal.md`；cpu 的持续增长不会被它拦住，这在合成世界里没有被测过；
 - 趋势子项触发时，报告里两条趋势证据暂无人话标签（`report.py` 不在本 change 范围），显示为「（未标注）」。
+
+## 9. 主线 K8s：第二个预注册世界（c0036 冻结，c0038 评估一次）
+
+### 9.1 协议与提交顺序
+
+| 事件 | 提交 | 时间 |
+|---|---|---|
+| 第二个世界盲写并冻结 | `10eefdb`（c0036 freeze） | 10-26 01:59 |
+| 按第一个世界的失败修 agent 的第一个实现提交 | `ff2931a`（c0037 impl） | 10-26 02:26 |
+| 评估规则与污染披露写下 | c0038 proposal | 评估前 |
+| 评估一次 | c0038 eval | 本节 |
+
+- 评估时 `git diff 10eefdb HEAD -- testenv/heldout/k8s_fresh2_*` 为空，世界文件 sha256 `cb493ab6…` 与冻结时一致。
+- 盲写的作者没有读 agent 代码、阈值和第一个世界的内容；写之前在 `git log` 标题里看到过第一个世界的聚合数字（unsafe_allow 1），没有看到具体失败项（c0036 evidence 自报）。
+- 做修复的 agent（c0037）被禁止读取这个世界；主 agent 从 c0036 回执里知道这个世界的难例概况，没有转述给 c0037。
+- 评估之后不改世界、不改 expect、不改 agent。
+
+### 9.2 结果
+
+| 指标 | 基础世界（样本内） | 第一个预注册世界，修复前（c0035） | 第一个预注册世界，修复后（已污染，c0037） | **第二个预注册世界（c0038）** |
+|---|---|---|---|---|
+| verdict_accuracy | 1.0（18/18） | 0.90（18/20） | 1.0 | **0.9167（22/24）** |
+| unsafe_allow | 0 | 1 | 0 | **0** |
+| unknown_recall | 1.0 | 1.0 | 1.0 | **0.0（0/2）** |
+| request_in_range | 1.0 | 0.7692 | 0.9231 | **0.9444（17/18）** |
+| realizable_accuracy | 1.0 | 0.6667 | 1.0 | 无（这个世界的 expect 没写 realizable 区间） |
+
+n=24，verdict_accuracy 22/24 的 Wilson 95% 区间约 [0.74, 0.98]。闸门失败（unknown_recall 0.0 < 1.0），退出码 1，原样记录。复现：`K8S_WORLD=testenv/heldout/k8s_fresh2_world.yaml K8S_SLOS=testenv/heldout/k8s_fresh2_slos.yaml K8S_RUN=k8s-fresh2 K8S_LABEL=k8s-fresh2 bash eval/k8s_heldout.sh`（回放）。
+
+### 9.3 逐条失分（原样，未修）
+
+| 条目 | 期望 | 实际 | 哪一层 | 说明 |
+|---|---|---|---|---|
+| edge-collector/cpu、memory | UNKNOWN | **没有决策** | collect：workload 发现 | 这个 workload 最后 7 天没有任何指标。agent 用 as_of 时刻的瞬时查询发现 workload，最后一周缺数据的 workload 在发现阶段就消失了，既没有 UNKNOWN，也没有出现在报告里。这是「缺数据要显式」原则的直接违反：没有放行，但沉默了。修复方向：用窗口内出现过的 workload（`max_over_time(...[窗口])`）做发现，当前没有数据的判 UNKNOWN（A），并写明「最近 N 天无数据」 |
+| session-cache/memory | ALLOW，区间 5.4–6.2 GiB | ALLOW，推荐 3.25 GiB | 契约口径（窗口长度） | 判定对，推荐值在区间外。这个世界周期 28 天，内存逐日下降。agent 按 14 天窗口取最大值（2.66 GiB × 1.2），作者按全周期最大值（4.64 GiB × 1.2 = 5.57）写区间，并在 expect 上标了 `judgment_conflict`。契约只说「窗口内最大值」，窗口取 14 天还是全部可用数据没有写清。这条更像契约歧义，不全是 agent 的错 |
+
+守住的难例：
+- report-builder：每周一次 1 小时的峰值，低于 1% 采样，p99 看不见，判 DENY。
+- search-indexer：cpu 线性增长。趋势守卫只对内存启用，推荐值仍落在区间内。
+- ingest-worker：sidecar 混入。c0037 的按容器过滤生效。
+- pricing-engine：峰值约为 limit 的 95%，但没有发生过 OOM，判 DENY。
+- notify-svc：燃烧率低于 1，但剩余预算约 10%，判 DENY。
+- invoice-api：SLO 目标在目录里，燃烧率指标缺失，判 REQUIRE_APPROVAL。
+- admin-console：没有任何 SLO，判 REQUIRE_APPROVAL。
+- queue-consumer：HPA 按内存扩缩，内存判 REQUIRE_APPROVAL。
+
+22 条叙述全部来自 LLM，未落地数字为 0。
+
+### 9.4 能证明什么、不能证明什么
+
+- 能证明：c0037 的两项修复（按容器过滤、内存趋势守卫）在没见过的世界上没有带来新的 unsafe ALLOW。第一个世界暴露的那类危险失败（该拒却放行），在第二个世界上为 0。
+- 新暴露的失败换了一类：从「放行了不该放行的」变成「对缺数据的 workload 沉默」。这类失败不会直接造成事故，但会让读报告的人以为这个 workload 没问题。
+- 不能证明：两个世界都由同一个作者家族、同一个生成器写成，不是独立分布；n=24 很小；这次评估之后，第二个世界对 edge-collector 这类失败也被污染了，修它需要第三个预注册世界。
+
+### 9.5 如果要修（只记录，不在本 change 做）
+
+1. workload 发现改用窗口内出现过的序列；当前无数据判 UNKNOWN（A），`unknown_needs` 写明缺了最近几天。
+2. 契约写清「窗口」的含义，以及数据在下降时窗口最大值算不算陈旧，再决定 session-cache 这类情形的推荐口径。
+3. 修完之后，在修之前先盲写并冻结第三个世界。
+

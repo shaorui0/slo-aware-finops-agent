@@ -1,0 +1,7 @@
+k8s run k8s-fresh2 (as_of 2026-10-25T23:55:00Z): 22 decisions {'ALLOW': 13, 'DENY': 4, 'REQUIRE_APPROVAL': 5}, plans 18, ledger {'new': 18, 'unchanged': 0, 'expired': 0, 'halted': 0, 'approved': 0, 'suppressed': 0, 'held': 0}, narrative {'llm': 22}
+runs/k8s-fresh2/k8s_decisions.json
+GATE FAILED: unknown_recall 0.0 < 1.0; verdict_accuracy 0.9167 is worse than baseline 1.0; unknown_recall 0.0 is worse than baseline 1.0; request_in_range 0.9444 is worse than baseline 1.0; realizable_accuracy None is worse than baseline 1.0
+{"verdict_accuracy": 0.9167, "unsafe_allow": 0, "unknown_recall": 0.0, "request_in_range": 0.9444, "realizable_accuracy": null}
+n={'expected': 24, 'decisions': 22, 'unknown_expected': 2, 'ranged': 18, 'realizable': 0} narrative={'llm': 22}
+wrong: edge-collector/cpu got None expect UNKNOWN, edge-collector/memory got None expect UNKNOWN
+exit=1
