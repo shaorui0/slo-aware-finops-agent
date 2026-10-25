@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "safe_halt": false,
+  "halt": null,
+  "last_run": {
+    "run_id": "k8s-demo",
+    "as_of": "2026-10-26T00:00:00Z"
+  },
+  "proposals": [
+    {
+      "plan_id": "P-K-shop-api-steady-cpu-0.25",
+      "key": "shop/api-steady/cpu",
+      "decision_id": "K-shop-api-steady-cpu",
+      "namespace": "shop",
+      "workload": "api-steady",
+      "resource": "cpu",
+      "verdict": "ALLOW",
+      "target": {
+        "request": 0.25,
+        "unit": "core"
+      },
+      "current_request": 1.0,
+      "status": "verified",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "ALLOW，目标 0.25 core"
+        },
+        {
+          "run_id": "act",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "approved",
+          "note": "approval 文件存在，执行器开始改"
+        },
+        {
+          "run_id": "act",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "applied",
+          "note": "P-K-shop-api-steady-cpu-0.25 补丁已应用，观察 120s"
+        },
+        {
+          "run_id": "act",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "verified",
+          "note": "observed 120s without a stop condition; live resources match the patch"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-shop-api-steady-memory-1.125",
+      "key": "shop/api-steady/memory",
+      "decision_id": "K-shop-api-steady-memory",
+      "namespace": "shop",
+      "workload": "api-steady",
+      "resource": "memory",
+      "verdict": "ALLOW",
+      "target": {
+        "request": 1.125,
+        "unit": "GiB"
+      },
+      "current_request": 2.0,
+      "status": "rolled_back",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "ALLOW，目标 1.125 GiB"
+        },
+        {
+          "run_id": "act",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "approved",
+          "note": "approval 文件存在，执行器开始改"
+        },
+        {
+          "run_id": "act",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "applied",
+          "note": "P-K-shop-api-steady-memory-1.125 补丁已应用，观察 120s"
+        },
+        {
+          "run_id": "act",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "rolled_back",
+          "note": "stop condition p99_seconds > 0.3 (observed 0.6763); resources verified equal to before"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-shop-hpa-managed-cpu-0.45",
+      "key": "shop/hpa-managed/cpu",
+      "decision_id": "K-shop-hpa-managed-cpu",
+      "namespace": "shop",
+      "workload": "hpa-managed",
+      "resource": "cpu",
+      "verdict": "REQUIRE_APPROVAL",
+      "target": {
+        "request": 0.45,
+        "unit": "core"
+      },
+      "current_request": 1.0,
+      "status": "proposed",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "REQUIRE_APPROVAL，目标 0.45 core"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-shop-hpa-managed-memory-1.125",
+      "key": "shop/hpa-managed/memory",
+      "decision_id": "K-shop-hpa-managed-memory",
+      "namespace": "shop",
+      "workload": "hpa-managed",
+      "resource": "memory",
+      "verdict": "ALLOW",
+      "target": {
+        "request": 1.125,
+        "unit": "GiB"
+      },
+      "current_request": 2.0,
+      "status": "proposed",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "ALLOW，目标 1.125 GiB"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-shop-mem-near-oom-cpu-0.1",
+      "key": "shop/mem-near-oom/cpu",
+      "decision_id": "K-shop-mem-near-oom-cpu",
+      "namespace": "shop",
+      "workload": "mem-near-oom",
+      "resource": "cpu",
+      "verdict": "ALLOW",
+      "target": {
+        "request": 0.1,
+        "unit": "core"
+      },
+      "current_request": 0.5,
+      "status": "proposed",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "ALLOW，目标 0.1 core"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-shop-packing-trap-cpu-0.2",
+      "key": "shop/packing-trap/cpu",
+      "decision_id": "K-shop-packing-trap-cpu",
+      "namespace": "shop",
+      "workload": "packing-trap",
+      "resource": "cpu",
+      "verdict": "ALLOW",
+      "target": {
+        "request": 0.2,
+        "unit": "core"
+      },
+      "current_request": 1.0,
+      "status": "proposed",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "ALLOW，目标 0.2 core"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-tools-no-slo-cpu-0.2",
+      "key": "tools/no-slo/cpu",
+      "decision_id": "K-tools-no-slo-cpu",
+      "namespace": "tools",
+      "workload": "no-slo",
+      "resource": "cpu",
+      "verdict": "REQUIRE_APPROVAL",
+      "target": {
+        "request": 0.2,
+        "unit": "core"
+      },
+      "current_request": 1.0,
+      "status": "proposed",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "REQUIRE_APPROVAL，目标 0.2 core"
+        }
+      ]
+    },
+    {
+      "plan_id": "P-K-tools-no-slo-memory-1",
+      "key": "tools/no-slo/memory",
+      "decision_id": "K-tools-no-slo-memory",
+      "namespace": "tools",
+      "workload": "no-slo",
+      "resource": "memory",
+      "verdict": "REQUIRE_APPROVAL",
+      "target": {
+        "request": 1.0,
+        "unit": "GiB"
+      },
+      "current_request": 2.0,
+      "status": "proposed",
+      "created_run": "k8s-demo",
+      "first_seen": "2026-10-26T00:00:00Z",
+      "last_seen": "2026-10-26T00:00:00Z",
+      "history": [
+        {
+          "run_id": "k8s-demo",
+          "as_of": "2026-10-26T00:00:00Z",
+          "status": "proposed",
+          "note": "REQUIRE_APPROVAL，目标 1 GiB"
+        }
+      ]
+    }
+  ]
+}

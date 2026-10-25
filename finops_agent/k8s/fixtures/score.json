@@ -1,98 +1,23 @@
 {
-  "n": 18,
-  "verdict_accuracy": 0.8889,
+  "verdict_accuracy": 1.0,
   "unsafe_allow": 0,
   "unknown_recall": 1.0,
-  "items": [
-    {
-      "id": "K-data-batch-nightly-cpu",
-      "expect": "DENY",
-      "got": "REQUIRE_APPROVAL"
-    },
-    {
-      "id": "K-data-batch-nightly-memory",
-      "expect": "DENY",
-      "got": "REQUIRE_APPROVAL"
-    },
-    {
-      "id": "K-shop-api-steady-cpu",
-      "expect": "ALLOW",
-      "got": "ALLOW"
-    },
-    {
-      "id": "K-shop-api-steady-memory",
-      "expect": "ALLOW",
-      "got": "ALLOW"
-    },
-    {
-      "id": "K-shop-api-tidal-cpu",
-      "expect": "DENY",
-      "got": "DENY"
-    },
-    {
-      "id": "K-shop-api-tidal-memory",
-      "expect": "NOOP",
-      "got": "NOOP"
-    },
-    {
-      "id": "K-shop-burning-slo-cpu",
-      "expect": "DENY",
-      "got": "DENY"
-    },
-    {
-      "id": "K-shop-burning-slo-memory",
-      "expect": "DENY",
-      "got": "DENY"
-    },
-    {
-      "id": "K-shop-hpa-managed-cpu",
-      "expect": "REQUIRE_APPROVAL",
-      "got": "REQUIRE_APPROVAL"
-    },
-    {
-      "id": "K-shop-hpa-managed-memory",
-      "expect": "ALLOW",
-      "got": "ALLOW"
-    },
-    {
-      "id": "K-shop-mem-near-oom-cpu",
-      "expect": "ALLOW",
-      "got": "ALLOW"
-    },
-    {
-      "id": "K-shop-mem-near-oom-memory",
-      "expect": "DENY",
-      "got": "DENY"
-    },
-    {
-      "id": "K-shop-new-service-cpu",
-      "expect": "UNKNOWN",
-      "got": "UNKNOWN"
-    },
-    {
-      "id": "K-shop-new-service-memory",
-      "expect": "UNKNOWN",
-      "got": "UNKNOWN"
-    },
-    {
-      "id": "K-shop-packing-trap-cpu",
-      "expect": "ALLOW",
-      "got": "ALLOW"
-    },
-    {
-      "id": "K-shop-packing-trap-memory",
-      "expect": "NOOP",
-      "got": "NOOP"
-    },
-    {
-      "id": "K-tools-no-slo-cpu",
-      "expect": "REQUIRE_APPROVAL",
-      "got": "REQUIRE_APPROVAL"
-    },
-    {
-      "id": "K-tools-no-slo-memory",
-      "expect": "REQUIRE_APPROVAL",
-      "got": "REQUIRE_APPROVAL"
-    }
-  ]
+  "request_in_range": 1.0,
+  "realizable_accuracy": 1.0,
+  "n": {
+    "expected": 18,
+    "decisions": 18,
+    "unknown_expected": 2,
+    "ranged": 8,
+    "realizable": 2
+  },
+  "wrong_verdicts": [],
+  "unsafe_allow_ids": [],
+  "out_of_range": [],
+  "realizable_misses": [],
+  "not_in_world": [],
+  "narrative_ungrounded": [],
+  "narrative_sources": {
+    "llm": 18
+  }
 }
