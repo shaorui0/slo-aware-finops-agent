@@ -258,6 +258,7 @@ class WeeklyMonthlyTest(unittest.TestCase):
                   "已提案 → 已批准 → 已应用 → 已核实", "已提案 → 已批准 → 已应用 → 已回滚"):
             self.assertIn(w, p)
         self.assertIn("93.8%", p)
+        self.assertIn("手写夹具", p)                         # the verify rows carry a note and the report shows it
         acts = jl(FX / "demo/k8s_actions.jsonl")
         final = {a["plan_id"]: a for a in acts if a["outcome"] != "refused"}
         for pid, a in final.items():

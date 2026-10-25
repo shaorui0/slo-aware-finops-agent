@@ -584,6 +584,8 @@ def weekly_verify(inputs) -> str:
             dev.append([_e(x.get("plan_id")), _e(d.get("cause")), usd(d.get("usd")), _e(d.get("explanation"))])
     out = ["<h2>核实结果：预测 vs 实际</h2>",
            wrap_table(["plan", "预测 /月（牌价估算）", "实际 /月（核实后）", "实现率", "节点数", "SLO", "观察窗口"], rows)]
+    notes = sorted({x["note"] for x in v if x.get("note")})
+    out += [f"<p class=note><b>注：</b>{_e(t)}</p>" for t in notes]
     out.append("<h3>偏差按原因拆开</h3>" + (wrap_table(["plan", "原因", "金额 /月", "解释"], dev) if dev else "<p class=note>没有记录偏差。</p>"))
     return "".join(out)
 
