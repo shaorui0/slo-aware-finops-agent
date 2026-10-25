@@ -46,6 +46,7 @@ test-metrics-server 以 `--world k8s` 方式启动时，提供下列序列。标
 | 指标 | 类型 | 说明 |
 |---|---|---|
 | `container_cpu_usage_seconds_total` | counter | cAdvisor |
+| `container_cpu_usage_cores` | gauge | 每 pod 5 分钟平均核数（相当于 recording rule）。服务不支持嵌套子查询，所以 p99 用它来算 |
 | `container_memory_working_set_bytes` | gauge | cAdvisor |
 | `container_cpu_cfs_periods_total` / `container_cpu_cfs_throttled_periods_total` | counter | throttling 比例 = throttled / periods |
 | `kube_pod_container_resource_requests` / `kube_pod_container_resource_limits` | gauge | 带 `resource="cpu"\|"memory"`、`unit="core"\|"byte"` |
@@ -60,7 +61,9 @@ test-metrics-server 以 `--world k8s` 方式启动时，提供下列序列。标
 | `slo_error_budget_remaining_ratio` / `slo_burn_rate_1h` | gauge | 只有定义了 SLO 的 workload 才有 |
 | `job_last_duration_seconds` | gauge | 批任务每次运行的完成时长 |
 
-查询只用 metrics_server 现有的 PromQL 子集。默认 `--world` 仍是原来的 AWS 世界，附录不受影响。
+workload 级指标（`kube_deployment_spec_replicas`、`kube_horizontalpodautoscaler_*`、`slo_*`、`job_last_duration_seconds`）带 namespace、workload、container，不带 pod。`kube_pod_status_phase` 不带 container。
+
+查询只用 metrics_server 现有的 PromQL 子集；`rate`、`increase` 的窗口至少 `[10m]`，因为 5 分钟网格上 `[5m]` 只含 1 个点，结果为空。默认 `--world` 仍是原来的 AWS 世界，附录不受影响。
 
 ### Requirement: 推荐器（确定性）
 
@@ -87,12 +90,14 @@ test-metrics-server 以 `--world k8s` 方式启动时，提供下列序列。标
 | D 可恢复 | 能回滚，且回滚时有容量 | 有变更前快照和回滚命令；按装箱模拟缩容后，集群空闲 allocatable ≥ Δrequest × 副本数 |
 
 判定规则按顺序执行，命中第一条即停：
-1. 推荐值不低于当前值 → NOOP
-2. C = FAIL → DENY（服务正在退化，冻结优化）
-3. A ≠ PASS → UNKNOWN，`unknown_needs` 写明补什么数据才能判
-4. B = FAIL 或 D = FAIL → DENY
+1. C = FAIL → DENY（服务正在退化，冻结优化）
+2. A ≠ PASS → UNKNOWN，`unknown_needs` 写明补什么数据才能判
+3. B = FAIL 或 D = FAIL → DENY。B 的风险守卫（窗口内 OOMKilled、峰值 working set ≥ `oom_guard` × limit、高峰 throttling ≥ `max_throttle`）按**当前状态**评估，即使没有提出降配也要评。推荐值不低于当前值且 B 因风险失败时，理由写「配额不足，不能降」，并把推荐值作为「可考虑上调」交给人
+4. 推荐值不低于当前值 → NOOP
 5. 任一条件为 UNKNOWN，或存在 HPA 联动（hpa.metric 是本资源）→ REQUIRE_APPROVAL
 6. 其余 → ALLOW
+
+（c0028 修订：原顺序把 NOOP 放在第一条，会让近 OOM 的内存永远落进 NOOP，B 的守卫走不到。）
 
 UNKNOWN 永远不被当成通过。
 
