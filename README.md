@@ -223,6 +223,11 @@ open runs/local/report.html
 | c0025-docs-consolidation | 10-24 | 文档合并：README 三层结果与嵌图、ARCHITECTURE 补判断层与处置、NARRATIVE、MATURITY、BUILD_PROCESS、覆盖面矩阵、实验记录对抗段、导读页重建 | 诚实的成绩单要把样本内 1.0 和预注册 0.75 放在同一张表里，并写明每一层证明什么 | [报告](reports/0025-docs-consolidation.html) · [笔记](notes/blog/0025-docs-consolidation.md) · [叙事](docs/NARRATIVE.md) |
 | c0026-code-wrapup | 10-24 | 收尾代码尾巴（显式快照、未再检出入报告、make test 覆盖全部、heldout 默认端口）+ 文档检查 D11/D16（--docs 开关） | 全局暂存和手写测试清单都是静默债；新检查先挂 flag 再切换 | [报告](reports/0026-code-wrapup.html) · [笔记](notes/blog/0026-code-wrapup.md) |
 | c0027-slo-aware-mainline | 10-26 | 改名 SLO-aware FinOps Agent；主线收窄到 K8s CPU/Memory requests；接口契约；12 类 AWS 冻结为附录 | 做深一项比铺开十二项更能证明能力；三者分离是判定的根 | [报告](reports/0027-slo-aware-mainline.html) · [笔记](notes/blog/0027-slo-aware-mainline.md) |
+| c0028-k8s-world | 10-26 | 合成 K8s 世界：9 个 workload（cpu/memory 各有 expect）、`--world k8s` 提供契约全部指标、drift_day3 场景、自带 FFD 的装箱事实测试 | 节点装箱是 CPU 与内存两个维度，requests 降了节点数可以纹丝不动；契约里 NOOP 规则会先于 OOM 守卫命中 | [报告](reports/0028-k8s-world.html) · [笔记](notes/blog/0028-k8s-world.md) |
+| c0029-k8s-decide | 10-26 | K8s 决策内核：PromQL 取数 → facts → 推荐器 → 装箱节省 → 策略引擎（A–D、六步判定顺序）；51 个单测覆盖每条规则 | 子查询不可用就让世界给每 pod gauge；条件 D 字面实现会与真节省冲突，需契约拍板 | [报告](reports/0029-k8s-decide.html) · [笔记](notes/blog/0029-k8s-decide.md) |
+| c0030-k3d-act | 10-26 | kubectl/k3d guard（显式 context + INTENT）；act.py 审批、漂移、canary、观察、自动回滚、验证；本地 k3d 演示 | 写路径先定谁来拦；throttle 来自 limit 不来自 request | [报告](reports/0030-k3d-act.html) · [笔记](notes/blog/0030-k3d-act.md) |
+| c0031-k8s-pipeline | 10-26 | K8s 主线串联：SLO 目录作为第三输入 → collect → decide → 隔离 LLM 叙述（盒带回放、数字落地）→ 计划 → 提案台账；`make k8s-eval` 进 CI（18/18 判对、unsafe_allow 0），`make k8s-days` 三天连续运行 | deadline 属于 SLO 定义而不是指标，补上第三输入就从 16/18 到 18/18；LLM 只写叙述，句子级抹除而不是信任 | [报告](reports/0031-k8s-pipeline.html) · [笔记](notes/blog/0031-k8s-pipeline.md) |
+| c0032-k8s-report | 10-26 | k8s 日报/周报/月报：一份数据三个中文视图，六段卡片、被拒表、核实对比、质量指标；样例 HTML | 被拒与数据不足和省钱一样重要；报告里的数字逐个回指决策 JSON | [报告](reports/0032-k8s-report.html) · [笔记](notes/blog/0032-k8s-report.md) |
 
 ### 2.5 目录
 
