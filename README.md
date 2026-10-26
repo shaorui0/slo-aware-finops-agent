@@ -43,6 +43,7 @@ make k8s-demo      # 需要 docker：本地 k3d 集群上走一遍「批准 → 
 | 判定规则的完整契约（输入、条件、顺序、产物） | [`openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md`](openspec/changes/c0027-slo-aware-mainline/specs/k8s-mainline/spec.md) |
 | 改完真的省了吗 | [`docs/K8S_SAVINGS_VERIFICATION.md`](docs/K8S_SAVINGS_VERIFICATION.md) |
 | 哪些数字能信：样本内 vs 预注册 | [`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md) §8 起 |
+| agent 怎么设计：上下文、工具边界、状态机、验证、失败恢复、评估（七张拓扑图） | [`docs/AGENT_TOPOLOGY.md`](docs/AGENT_TOPOLOGY.md) |
 | 这个项目证明了什么 | [`docs/NARRATIVE.md`](docs/NARRATIVE.md) |
 | 完成标准逐条核对 | [`docs/MATURITY.md`](docs/MATURITY.md) |
 | 怎么用多个 agent 把它做出来 | [`docs/BUILD_PROCESS.md`](docs/BUILD_PROCESS.md) |
@@ -162,6 +163,8 @@ requests 降了不等于账单降了。核实比较变更前后两段窗口的�
 ## 第二部分 · agent
 
 ### 2.1 设计
+
+下图是总览。六个机制各自的拓扑和代码位置见 [`docs/AGENT_TOPOLOGY.md`](docs/AGENT_TOPOLOGY.md)。
 
 ```mermaid
 flowchart TB
