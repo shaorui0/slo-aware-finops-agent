@@ -129,7 +129,7 @@ flowchart LR
 ```
 
 - 只给这一条决策：`narrate.py:59` `facts_view`。放在一起讲会把 A 的数字串到 B 上。
-- 规则与禁止算术：`narrate.py:28` `RULES`。
+- 规则与禁止算术：`narrate.py:31` `RULES`。
 - 第三方字段围起来：`narrate.py:37`、`narrate.py:72`。
 - 长期记忆在台账文件里，由代码读入，不在对话里：`runs/k8s_state.json`。
 
