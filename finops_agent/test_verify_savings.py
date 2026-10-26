@@ -157,11 +157,11 @@ class Commitment(unittest.TestCase):
 
 
 class EndToEnd(unittest.TestCase):
-    """Control chain (c0018): real servers and real agent runs on ports 37590-37593 (this change's range is 37566-37599)."""
+    """Control chain (c0018): real servers and real agent runs on OS-picked ports."""
 
     @classmethod
     def setUpClass(cls):
-        cls.periods = v.collect(37590, chain="control")
+        cls.periods = v.collect(0, chain="control")
         cls.res = v.analyze(cls.periods)
 
     def test_resolved_sets_match_scenario_expectations(self):
@@ -182,7 +182,7 @@ class EndToEnd(unittest.TestCase):
 
     def test_document_is_deterministic(self):
         first, _ = v.build(self.res)
-        again = v.analyze(v.collect(37592, chain="control"))
+        again = v.analyze(v.collect(0, chain="control"))
         second, _ = v.build(again)
         self.assertEqual(v.to_md(first), v.to_md(second))
 
@@ -300,11 +300,11 @@ def _row(res, prefix):
 
 
 class ScenarioChain(unittest.TestCase):
-    """c0021: real servers and real agent runs over testenv/scenarios/verify_*.yaml, ports 37570-37573."""
+    """c0021: real servers and real agent runs over testenv/scenarios/verify_*.yaml, OS-picked ports."""
 
     @classmethod
     def setUpClass(cls):
-        cls.periods = v.collect(37570, chain="scenario")
+        cls.periods = v.collect(0, chain="scenario")
         cls.res = v.analyze(cls.periods)
         cls.a = _row(cls.res, "unattached_volume|vol-0vfya")
         cls.b = _row(cls.res, "schedule_dev_but_sp_covered|")
@@ -372,11 +372,11 @@ class ScenarioChain(unittest.TestCase):
             self.assertEqual(d["sum"], d["delta"])
 
     def test_the_document_is_deterministic_and_all_checks_pass(self):
-        res_c = v.analyze(v.collect(37574, chain="control"))
+        res_c = v.analyze(v.collect(0, chain="control"))
         blocks, ca, cc = v.build_all(self.res, res_c)
         self.assertTrue(all(ok for _c, ok in ca["checks"] + cc["checks"]), [c for c, ok in ca["checks"] + cc["checks"] if not ok])
-        again_s = v.analyze(v.collect(37576, chain="scenario"))
-        again_c = v.analyze(v.collect(37578, chain="control"))
+        again_s = v.analyze(v.collect(0, chain="scenario"))
+        again_c = v.analyze(v.collect(0, chain="control"))
         blocks2, _, _ = v.build_all(again_s, again_c)
         self.assertEqual(v.to_md(blocks), v.to_md(blocks2))
 

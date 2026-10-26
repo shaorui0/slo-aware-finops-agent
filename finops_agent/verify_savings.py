@@ -523,6 +523,13 @@ def _free(port):
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 
+def _pick_port():
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def _amount(x):
     return F(Decimal(x))
 
@@ -592,9 +599,10 @@ def apply_claims(periods: list, worlds: list, root: Path) -> None:
 
 def collect(base_port=37566, root: Path = ROOT, keep: str | None = None, log=lambda s: None, chain: str = "control") -> list[Period]:
     """Run the agent once per period with one shared state file (same pattern as scripts/rot_demo.sh) and read
-    each period's own Cost Explorer. Two servers per period, killed before the next period starts."""
+    each period's own Cost Explorer. Two servers per period, killed before the next period starts.
+    base_port=0 lets the OS pick both ports (tests use this: fixed ports in the ephemeral range flake on CI)."""
     import yaml
-    aws_port, prom_port = base_port, base_port + 1
+    aws_port, prom_port = (base_port, base_port + 1) if base_port else (_pick_port(), _pick_port())
     for port in (aws_port, prom_port):
         if not _free(port):
             raise SystemExit(f"port {port} is busy")
@@ -605,13 +613,15 @@ def collect(base_port=37566, root: Path = ROOT, keep: str | None = None, log=lam
     try:
         for n, (label, world, start, end) in enumerate(CHAINS[chain], 1):
             wargs = ["--world", str(root / world)] if world else []
+            errs = [tmp / f"aws-{n}.err", tmp / f"prom-{n}.err"]
             procs = [subprocess.Popen([sys.executable, "-m", "testenv.aws_server", "--port", str(aws_port), *wargs],
-                                      cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
+                                      cwd=root, stdout=subprocess.DEVNULL, stderr=errs[0].open("w")),
                      subprocess.Popen([sys.executable, "-m", "testenv.metrics_server", "--port", str(prom_port), *wargs],
-                                      cwd=root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)]
+                                      cwd=root, stdout=subprocess.DEVNULL, stderr=errs[1].open("w"))]
             try:
                 if not (_wait(f"http://127.0.0.1:{aws_port}/health") and _wait(f"http://127.0.0.1:{prom_port}/-/healthy")):
-                    raise SystemExit("test servers did not come up")
+                    tails = "\n".join(f"{e.name} (exit {pr.poll()}): {e.read_text()[-500:]}" for e, pr in zip(errs, procs))
+                    raise SystemExit(f"test servers did not come up on ports {aws_port}/{prom_port}\n{tails}")
                 rid = f"verify-{chain}-{n}"
                 log(f"agent run {rid} on {world or 'base world'}")
                 r = subprocess.run([sys.executable, "-m", "finops_agent", "run", "--aws-endpoint", f"http://127.0.0.1:{aws_port}",
