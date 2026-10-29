@@ -322,6 +322,7 @@ flowchart TB
 | c0038-k8s-fresh2-eval | 10-26 | 第二个预注册 K8s 世界（修复前冻结）评估一次：verdict_accuracy 0.9167、unsafe_allow 0、unknown_recall 0（最后一周无数据的 workload 被静默丢弃） | 修复的考卷要在修复前写好；危险失败清零，新失败是「沉默」 | [报告](reports/0038-k8s-fresh2-eval.html) · [笔记](notes/blog/0038-k8s-fresh2-eval.md) |
 | c0039-mainline-narrative | 10-26 | README / NARRATIVE / MATURITY / BUILD_PROCESS 以主线为主体：判定流程图、日报说明、核实表、四世界成绩单、主线架构图；广度扫描移入附录 | 成绩单的列顺序就是论证顺序；危险失败单列一行 | [报告](reports/0039-mainline-narrative.html) · [笔记](notes/blog/0039-mainline-narrative.md) |
 | c0040-agent-topology | 10-26 | `docs/AGENT_TOPOLOGY.md`：完整拓扑 + 上下文、工具边界、状态机、验证、失败恢复、评估六张分图，每张附 `file:line` | 一句话设计：确定性骨架，LLM 只开一个窄口；失败只流向「停住」或「交给人」 | [报告](reports/0040-agent-topology.html) · [笔记](notes/blog/0040-agent-topology.md) |
+| c0041-traditional-vs-agent | 10-29 | README 新增「传统降配流程和这个 agent 差在哪」：六步对照表、三方对比（人 / 人加脚本 / agent）、三条要点 | agent 没发明新方法论，只是重新分工：规则给代码、讲解给模型、执行权给人 | [报告](reports/0041-traditional-vs-agent.html) · [笔记](notes/blog/0041-traditional-vs-agent.md) |
 
 ### 2.5 目录
 
