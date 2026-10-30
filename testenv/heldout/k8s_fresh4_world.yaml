@@ -1,0 +1,287 @@
+# Fourth pre-registered K8s world (c0045). Schema: c0027 k8s-mainline spec; SLO catalog: k8s_fresh4_slos.yaml.
+# Written blind: no agent code, no evaluation result, no earlier held-out world was read. Frozen once committed; never edited after.
+# Units: cpu in cores, memory in GiB. request_range follows the contract recommender:
+#   cpu = p99 per-pod usage x 1.3, ceil 0.05 core;  memory = max working set x 1.2, ceil 64Mi;  range ~ +-10% (wider where the
+#   quantile definition can move the ceil step). realizable_usd_month = nodes freed when ONLY this change is applied
+#   (first-fit decreasing, memory desc then cpu desc, under every sort key tried) x node_hour_usd x 730; one node = 183.96 USD.
+# Extra keys the generator ignores: hard_category (why an automated recommender struggles), range_note (range lies at/above the current request).
+cluster:
+  name: finops-k8s-synth-fresh4
+  period: {start: "2026-10-09T00:00:00Z", end: "2026-10-30T00:00:00Z"}   # 21 days
+  step_seconds: 300
+
+pricing: {node_type: r6i.xlarge, node_hour_usd: 0.252, cpu_core_hour_usd: 0.0198, mem_gib_hour_usd: 0.0054}
+
+nodes: {count: 14, min: 8, max: 20, allocatable: {cpu: 3.9, memory_gib: 29.5}}
+
+workloads:
+  - name: geo-lookup
+    namespace: edge
+    team: team-platform
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "1", memory: "3Gi"}, limits: {cpu: "2", memory: "4Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.25}
+    profile:
+      cpu: {kind: flat, base: 0.2, jitter: 0.08}
+      mem: {kind: flat, base_gib: 1.1, jitter: 0.03}
+      http: {rps: 30, p99_base: 0.08}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.27, 0.33], realizable_usd_month: [180, 188], why: "flat ~0.2 core on 3 pods, p99 ~0.22, so p99 x1.3 -> 0.3 core; applied alone the cut frees one node"}
+      memory: {verdict: ALLOW, request_range: [1.25, 1.5], realizable_usd_month: [0, 0], why: "max working set ~1.13 GiB flat, 3 GiB reserved; the cluster is cpu-bound so the memory cut frees no node"}
+
+  - name: audit-trail
+    namespace: compliance
+    team: team-security
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "0.5", memory: "2Gi"}, limits: {cpu: "1", memory: "3Gi"}}
+    profile:
+      cpu: {kind: flat, base: 0.08, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.03}
+      http: {rps: 3, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.13, 0.17], realizable_usd_month: [0, 0], why: "usage is low and the data complete, but no SLO is defined: C is UNKNOWN and utilization must not stand in for it"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [0.8, 0.95], realizable_usd_month: [0, 0], why: "C is UNKNOWN (no SLO)"}
+
+  - name: edge-proxy
+    namespace: edge
+    team: team-platform
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.25}
+    profile:
+      cpu: {kind: flat, base: 0.8, jitter: 0.06}
+      mem: {kind: flat, base_gib: 1.75, jitter: 0.02}
+      http: {rps: 40, p99_base: 0.08}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: NOOP, request_range: [1.0, 1.3], why: "right-sized: p99 ~0.86 core x1.3 is above the current 1.0 request"}
+      memory: {verdict: NOOP, request_range: [2.0, 2.4], why: "max working set ~1.79 GiB x1.2 is above the current 2 GiB request"}
+
+  - name: ledger-sync
+    namespace: finance
+    team: team-ledger
+    kind: Deployment
+    replicas: 2
+    hard_category: data_quality
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.5}
+    profile:
+      cpu: {kind: flat, base: 0.15, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.8, jitter: 0.03}
+      http: {rps: 12, p99_base: 0.15}
+      gaps:
+        - {from: "2026-10-14T00:00:00Z", to: "2026-10-24T00:00:00Z"}   # 10 days of scrape outage in the middle; data resumes and is fresh
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.22, 0.28], why: "a 10-day hole in the middle of the window leaves 11 valid days (< min_days 14, coverage ~52%); the series span looks like 21 days but A is UNKNOWN; needs >=14 days of samples"}
+      memory: {verdict: UNKNOWN, request_range: [0.9, 1.1], why: "same hole in the memory series (A unknown)"}
+
+  - name: fraud-scorer
+    namespace: risk
+    team: team-risk
+    kind: Deployment
+    replicas: 4
+    hard_category: traffic_shape
+    container: {name: app, requests: {cpu: "2", memory: "4Gi"}, limits: {cpu: "3", memory: "5Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      per_pod_spread: 0.5          # sticky routing: pod usage is 0.25 / 0.75 / 1.25 / 1.75 of the mean
+      cpu: {kind: flat, base: 0.4, jitter: 0.05}
+      mem: {kind: flat, base_gib: 2.0, jitter: 0.02}
+      http: {rps: 25, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.95, 1.1], realizable_usd_month: [360, 376], why: "mean pod ~0.4 core but the hottest pod runs ~0.73 (p99): the request is per pod so it must cover the hot pod, p99 x1.3 -> 1.0; the pod-average (0.55) would starve it"}
+      memory: {verdict: ALLOW, request_range: [2.25, 2.75], realizable_usd_month: [0, 0], why: "memory is even across pods, max ~2.04 GiB; the memory cut frees no node"}
+
+  - name: thumbnail-svc
+    namespace: media
+    team: team-media
+    kind: Deployment
+    replicas: 3
+    hard_category: traffic_shape
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.995, p99_seconds: 0.8}
+    profile:
+      cpu: {kind: daily_burst, base: 0.15, jitter: 0.06, burst_hour: 3, burst_samples: 2, burst_value: 0.9}   # cron: 10 min a day at ~0.9 core
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.03}
+      http: {rps: 6, p99_base: 0.3}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.225, 0.275], judgment_conflict: true, realizable_usd_month: [180, 188], why: "judgment conflict: a 10-minute cron burst to ~0.9 core is 0.7% of samples so p99 stays ~0.16 and the contract gives 0.25 core, while an SRE would size the request for the burst (limit is 2 so nothing throttles); range follows the contract, verdict follows A-D (all pass, no throttling)"}
+      memory: {verdict: ALLOW, request_range: [0.79, 0.96], realizable_usd_month: [0, 0], why: "max working set ~0.72 GiB flat"}
+
+  - name: edge-gateway
+    namespace: edge
+    team: team-platform
+    kind: Deployment
+    replicas: 6
+    hard_category: autoscaler_coupling
+    container: {name: app, requests: {cpu: "1", memory: "1Gi"}, limits: {cpu: "1", memory: "2Gi"}}
+    hpa: {metric: cpu, target_utilization: 70, min: 3, max: 6}   # already at max replicas
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: tidal, base: 0.45, amp: 0.42, peak_hour: 15, sigma_h: 2.5, spike_samples: 0, spike_value: 0.95, jitter: 0.04}
+      mem: {kind: flat, base_gib: 0.5, jitter: 0.02}
+      throttle: {onset: 0.5, slope: 1.0, cap: 0.6}
+      http: {rps: 35, p99_base: 0.1, p99_per_throttle: 0.5}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [1.2, 1.3], range_note: "recommendation is above the current 1.0 request; the HPA is already at max replicas, so the request should rise, not fall", why: "HPA is pinned at max (6/6) and the daily peak reaches ~90% of a request that equals the limit: throttling ~0.45 at peak (B fails). B precedes the HPA rule, so DENY, not REQUIRE_APPROVAL"}
+      memory: {verdict: ALLOW, request_range: [0.56, 0.69], realizable_usd_month: [0, 0], why: "the HPA metric is cpu, memory is not coupled; max working set ~0.51 GiB"}
+
+  - name: settle-api
+    namespace: pay
+    team: team-pay
+    kind: Deployment
+    replicas: 3
+    hard_category: slo_situation
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.9995, p99_seconds: 0.4}
+    profile:
+      cpu: {kind: flat, base: 0.12, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.03}
+      http: {rps: 18, p99_base: 0.12}
+    data_days: 21
+    events:
+      - {type: slo_burn, at: "2026-10-29T20:00:00Z", burn_rate: 1.7, budget_remaining: 0.72, ramp_hours: 8}
+    expect:
+      cpu: {verdict: DENY, request_range: [0.18, 0.22], why: "error budget is healthy (~0.66) but the 1h burn rate is ~1.7 > 1 right now (C fails): a service that is burning is not touched, whatever the budget says"}
+      memory: {verdict: DENY, request_range: [0.79, 0.96], why: "same C failure"}
+
+  - name: reconcile-nightly
+    namespace: data
+    team: team-data
+    kind: Deployment
+    replicas: 1
+    hard_category: slo_situation
+    container: {name: job, requests: {cpu: "1.5", memory: "4Gi"}, limits: {cpu: "2", memory: "6Gi"}}
+    slo: {deadline_seconds: 7200}
+    profile:
+      cpu: {kind: batch, start_hour: 1, hours: 2, active: 0.35, idle: 0.01, jitter: 0.04}    # io-bound job, cpu barely used
+      mem: {kind: batch, idle_gib: 0.4, active_gib: 2.0, jitter: 0.02}
+      job: {base_seconds: 5000, jitter_seconds: 2350, finish_hour: 3.2}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [0.45, 0.55], why: "mean run ~0.69 of the deadline and the last run ~0.67, but one run in the window took ~7090s, ~0.98 of 7200s (C fails on the maximum, not the mean or the last run); the job is io-bound so the cpu cut itself would be harmless"}
+      memory: {verdict: DENY, request_range: [2.25, 2.75], why: "same C failure: the deadline guard looks at the worst run in the window"}
+
+  - name: catalog-index
+    namespace: search
+    team: team-search
+    kind: Deployment
+    replicas: 2
+    hard_category: packing
+    container: {name: app, requests: {cpu: "1", memory: "14Gi"}, limits: {cpu: "2", memory: "16Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.2, jitter: 0.08}
+      mem: {kind: flat, base_gib: 9.0, jitter: 0.01}
+      http: {rps: 10, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.27, 0.33], realizable_usd_month: [180, 188], why: "p99 ~0.22 -> 0.3 core; applied alone the cut frees one node"}
+      memory: {verdict: ALLOW, request_range: [9.85, 12.0], realizable_usd_month: [0, 0], why: "max working set ~9.1 GiB -> 10.94 GiB; 6.1 GiB of reservation is released on paper (largest memory delta in the world) but nodes are cpu-bound, so no node is freed: realizable 0"}
+
+  - name: ranking-api
+    namespace: search
+    team: team-search
+    kind: Deployment
+    replicas: 3
+    hard_category: packing
+    container: {name: app, requests: {cpu: "1", memory: "6Gi"}, limits: {cpu: "2", memory: "8Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.55, jitter: 0.08}
+      mem: {kind: flat, base_gib: 3.0, jitter: 0.01}
+      http: {rps: 10, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.72, 0.88], realizable_usd_month: [180, 188], why: "p99 ~0.6 -> 0.8 core: only 0.6 core released in total, yet the cluster is packed tight enough that it frees a whole node (small request delta, full node saved)"}
+      memory: {verdict: ALLOW, request_range: [3.32, 4.05], realizable_usd_month: [0, 0], why: "max working set ~3.03 GiB -> 3.69 GiB: 6.9 GiB released on paper, no node freed (realizable 0)"}
+
+  - name: cart-archiver
+    namespace: shop
+    team: team-cart
+    kind: Deployment
+    replicas: 2
+    hard_category: lifecycle
+    container: {name: app, requests: {cpu: "0.5", memory: "1Gi"}, limits: {cpu: "1", memory: "2Gi"}}
+    slo: {availability: 0.995, p99_seconds: 0.8}
+    profile:
+      cpu: {kind: flat, base: 0.06, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.4, jitter: 0.03}
+      http: {rps: 2, p99_base: 0.2}
+      gaps:
+        - {from: "2026-10-25T00:00:00Z", to: "2026-10-31T00:00:00Z"}   # scaled away / pods gone: the last 5 days have no samples at all
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.09, 0.11], why: "16 days of old data but the last sample is 5 days before as_of (stale_days 3): not an active workload, A is UNKNOWN; it must still appear as a decision, not be dropped by an instant-vector discovery"}
+      memory: {verdict: UNKNOWN, request_range: [0.45, 0.55], why: "same: no memory samples for the last 5 days"}
+
+  - name: recommend-svc
+    namespace: shop
+    team: team-growth
+    kind: Deployment
+    replicas: 2
+    hard_category: request_direction
+    container: {name: app, requests: {cpu: "0.5", memory: "2Gi"}, limits: {cpu: "3", memory: "4Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.4}
+    profile:
+      cpu: {kind: flat, base: 1.6, jitter: 0.05}
+      mem: {kind: flat, base_gib: 3.0, jitter: 0.02}
+      http: {rps: 20, p99_base: 0.15}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: NOOP, request_range: [2.0, 2.5], range_note: "recommendation is above the current 0.5 request: this one is under-requested", why: "usage ~1.7 core is 3x the 0.5 request (burstable, limit 3, no throttling); there is nothing to cut: p99 x1.3 = 2.25 is above the request, so NOOP; the raise is a human call"}
+      memory: {verdict: NOOP, request_range: [3.3, 4.1], range_note: "recommendation is above the current 2 GiB request", why: "working set ~3.06 GiB (77% of the 4 GiB limit) vs a 2 GiB request: under-requested, max x1.2 is above the request, NOOP"}
+
+  - name: search-suggest
+    namespace: search
+    team: team-search
+    kind: Deployment
+    replicas: 3
+    hard_category: time_regime
+    container: {name: app, requests: {cpu: "2", memory: "1.5Gi"}, limits: {cpu: "2", memory: "2Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.4, jitter: 0.06}
+      mem: {kind: flat, base_gib: 0.6, jitter: 0.02}
+      throttle: {onset: 0.4, slope: 1.0, cap: 0.6}
+      http: {rps: 30, p99_base: 0.1, p99_per_throttle: 0.5}
+    data_days: 21
+    events:
+      - {type: load, at: "2026-10-29T12:00:00Z", factor: 3.4}    # traffic regime changed 12h before as_of
+    expect:
+      cpu: {verdict: DENY, request_range: [1.65, 2.0], range_note: "recommendation is just under the current 2.0 request", why: "20.5 days at ~0.4 core, then a 3.4x step 12h ago: usage ~1.36 core on a request equal to the limit, throttling ~0.3 at peak (B fails). Window averages hide it (average throttle ~0.01); the guard must look at the current regime"}
+      memory: {verdict: ALLOW, request_range: [0.68, 0.83], realizable_usd_month: [0, 0], why: "the load step does not move the working set (max ~0.61 GiB); burn rate stays below 1"}
+
+traps:
+  - {workload: ledger-sync, why: "a 10-day hole in the middle of the window: first-to-last span is 21 days, valid days are 11"}
+  - {workload: fraud-scorer, why: "the pod-average hides a hot pod: the per-pod request must follow the hottest pod"}
+  - {workload: thumbnail-svc, why: "a daily cron burst is below p99; the contract formula and an SRE disagree"}
+  - {workload: edge-gateway, why: "HPA already at max replicas and throttling: B fails before the HPA rule is reached"}
+  - {workload: settle-api, why: "healthy budget but burn rate > 1 right now"}
+  - {workload: reconcile-nightly, why: "mean and last run are fine, the worst run in the window is at ~98% of the deadline"}
+  - {workload: catalog-index, why: "largest memory delta on paper, zero nodes freed"}
+  - {workload: ranking-api, why: "small cpu delta frees a node; large memory delta frees none"}
+  - {workload: cart-archiver, why: "last sample is 5 days old: stale, but must still be a decision"}
+  - {workload: recommend-svc, why: "usage far above request: nothing to cut"}
+  - {workload: search-suggest, why: "a 12h-old traffic step is invisible to window averages but is throttling now"}
