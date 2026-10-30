@@ -16,6 +16,7 @@ from urllib.request import urlopen
 import yaml
 
 from finops_agent.collect import Trace
+from finops_agent.k8s.recommend import recommend
 
 # ---- metric names (contract) --------------------------------------------------
 CPU_USAGE = "container_cpu_usage_cores"        # NOT in the contract table: per-pod cores gauge, because subqueries are unsupported
@@ -282,6 +283,10 @@ class Collector:
             inst(key, f"max by (workload)(quantile_over_time({qt}, {metric}{{{sel}}}[{self.win}]))", self.win, scale)
         inst("max", f"max by (workload)(max_over_time({metric}{{{sel}}}[{self.win}]))", self.win, scale)
 
+        rh = self.policy.get("recent_hours")
+        if rh:   # c0046: observed max of the most recent window; evidence only when it is a factor (see collect_facts)
+            inst("recent_max", f"max by (workload)(max_over_time({metric}{{{sel}}}[{rh:g}h]))", f"{rh:g}h", scale)
+
         hq = f"max by (workload)(max_over_time({metric}{{{sel}}}[1h]))"
         series = self.hourly(hq)
         pol = self.policy
@@ -355,6 +360,15 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
                     book.add(k, *shared[k])
             for k, meas in cluster["evidence"].items():
                 book.add(k, *meas)
+            recent = None
+            if "recent_max" in rm:
+                rv, rwin = rm["recent_max"][2], rm["recent_max"][1]
+                recent = {"hours": c.policy["recent_hours"], "max": None if rv is None else round(rv, 6)}
+                # like the trend rows: an evidence entry only when the recent value is a factor in condition B (the recommendation is
+                # below it x (1+margin)), so every other decision's evidence list, and so its narration prompt, is unchanged
+                rec = recommend({"resource": resource, "usage": {"p99": rm["p99"][2], "max": rm["max"][2]}}, c.policy)
+                if rv is not None and rec is not None and rec["request"] < rv * (1 + c.policy["margin"]) - 1e-9:
+                    book.add("recent_max", *rm["recent_max"])
             unit = "core" if resource == "cpu" else "GiB"
             facts.append({
                 "id": f"K-{ns}-{wl}-{resource}", "workload": wl, "namespace": ns, "team": team, "resource": resource,
@@ -366,6 +380,7 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
                           "oom_events": shared["oom"][2], "trend": trend},
                 "hpa": hpa,
                 "freshness": rm["freshness"],
+                "recent": recent,
                 "container": shared["container"],
                 "slo": {"burn_rate_1h": shared["burn"][2], "budget_remaining": shared["budget"][2],
                         "job_max_duration": shared["job"][2], "deadline_seconds": shared["deadline"][2]},

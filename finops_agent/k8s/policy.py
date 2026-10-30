@@ -102,6 +102,17 @@ def cond_b(f, rec, cluster, policy):
         if lim and u.get("max") is not None and u["max"] >= policy["oom_guard"] * lim:
             fails.append(f"峰值 {u['max']:g} GiB ≥ {policy['oom_guard']:g} × limit {lim:g} GiB，已贴近 OOM")
         ok = f"推荐 ≥ 峰值 × (1+{margin:g})，无 OOMKilled，" + (f"峰值 < {policy['oom_guard']:g} × limit" if lim else "未设 limit，OOM 判据不适用")
+    rc = f.get("recent")   # c0046: recent-usage sub-check, both resources. UNKNOWN (not FAIL): a few hours cannot tell a new regime from a transient
+    if rc is not None:
+        unit = "core" if res == "cpu" else "GiB"
+        if rc.get("max") is None:
+            unknowns.append((f"最近 {rc['hours']:g} 小时没有{'CPU' if res == 'cpu' else '内存'}使用量样本，无法判断近期用量",
+                             f"需要最近 {rc['hours']:g} 小时的{'CPU' if res == 'cpu' else '内存'}使用量数据"))
+        elif rec is not None and rec["request"] < rc["max"] * (1 + margin) - 1e-9:
+            keys = keys + ["recent_max"]
+            unknowns.append((f"近期用量高于推荐值：最近 {rc['hours']:g} 小时观测最大 {rc['max']:g} {unit}，推荐 {rec['request']:g} {unit} "
+                             f"低于 {rc['max']:g} × (1+{margin:g})，用量可能刚发生变化，14 天统计还描述不了新状态",
+                             f"需要人工确认近期（最近 {rc['hours']:g} 小时）的用量变化是一次性的，还是新常态（新常态下 14 天 p99 / 峰值已过时）"))
     tr = u.get("trend")
     if tr:
         keys = keys + ["trend_slope", "trend_proj"]

@@ -20,7 +20,8 @@ class CatalogTest(unittest.TestCase):
         c = d[("api", "cpu")]["conditions"]["C"]
         self.assertEqual(c["status"], "UNKNOWN")
         self.assertIn("SLO 目录", c["why"])
-        self.assertIn("需要在 SLO 目录里为该 workload 定义 SLO", d[("api", "cpu")]["unknown_needs"][0])
+        # c0046: the canned world answers any max_over_time with the window max, so B's recent-usage need can come first; the SLO need must be listed
+        self.assertTrue(any("需要在 SLO 目录里为该 workload 定义 SLO" in n for n in d[("api", "cpu")]["unknown_needs"]), d[("api", "cpu")]["unknown_needs"])
         self.assertNotEqual(d[("api", "cpu")]["verdict"], "ALLOW")
 
     def test_catalog_entry_with_metrics_passes(self):

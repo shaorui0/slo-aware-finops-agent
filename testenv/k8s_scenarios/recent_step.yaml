@@ -1,0 +1,23 @@
+# c0046: the base world plus one workload whose cpu tripled 3 hours before as_of (a release): 14d p99 still describes the old regime.
+# In-sample case for the "recent usage" sub-check of condition B. Before c0046 the cpu recommendation (p99 x 1.3) was half of
+# current usage and the verdict was ALLOW; now it must not be ALLOW. Memory is flat and stays ALLOW-shaped.
+# Serve with:  python3 -m testenv.metrics_server --world testenv/k8s_scenarios/recent_step.yaml
+scenario: {name: recent_step, base: testenv/k8s_world.yaml}
+add_workloads:
+  - name: step-up-svc
+    namespace: shop
+    team: team-checkout
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999}
+    profile:
+      cpu: {kind: flat, base: 0.2, jitter: 0.05}
+      mem: {kind: flat, base_gib: 0.5, jitter: 0.02}
+      http: {rps: 10, p99_base: 0.2}
+    data_days: 21
+    events:
+      - {type: load, at: "2026-10-25T21:00:00Z", factor: 3.0}
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.27, 0.33], why: "last 3 hours cpu x3 (a release): 14d p99 is the old regime, the recommender still says p99 x1.3 = 0.3 core; recent max x1.1 is above it, so B is UNKNOWN and a human decides"}
+      memory: {verdict: ALLOW, request_range: [0.56, 0.69], why: "memory is flat; the regime step is cpu only"}
