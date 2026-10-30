@@ -103,6 +103,70 @@ class ScoreTest(unittest.TestCase):
             self.assertEqual(S.main([str(t / "k8s_decisions.json"), "--world", str(t / "w.yaml"), "--baseline", str(t / "b.json")]), 1)
 
 
+class RecentUsageTest(unittest.TestCase):
+    """c0046: allow_below_recent = ALLOW whose recommended request is below the workload's actual recent usage, derived from the world."""
+    SC = str(S.ROOT / "testenv" / "k8s_scenarios" / "recent_step.yaml")
+    AS_OF = "2026-10-26T00:00:00Z"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.recent = S.recent_usage(cls.SC, cls.AS_OF)
+
+    def doc(self, verdict, req, res="cpu"):
+        d = {"namespace": "shop", "workload": "step-up-svc", "resource": res, "verdict": verdict, "recommendation": {"request": req},
+             "savings": {"realizable_usd_month": 0.0}, "narrative": {"source": "llm"}}
+        return {"as_of": self.AS_OF, "decisions": [d]}
+
+    def world(self):
+        w = yaml.safe_load(Path(self.SC).read_text())["add_workloads"][0]
+        return {"workloads": [w]}
+
+    def test_recent_usage_comes_from_the_world_not_the_decision(self):
+        r = self.recent[("shop", "step-up-svc", "cpu")]
+        self.assertTrue(0.6 < r < 0.75, r)                         # 0.2 x 3, per-pod max over the last hours
+        self.assertLess(self.recent[("shop", "step-up-svc", "memory")], 0.7)
+
+    def test_allow_below_recent_usage_is_counted_and_gated(self):
+        s = S.score(self.doc("ALLOW", 0.3), self.world(), self.recent)
+        self.assertEqual((s["allow_below_recent"], s["allow_below_recent_ids"]), (1, ["step-up-svc/cpu"]))
+        self.assertEqual(s["unsafe_allow"], 0)                      # the old metric cannot see it: expect is not DENY/UNKNOWN
+        fails = S.gates(s, None)
+        self.assertTrue(any("allow_below_recent" in f for f in fails), fails)
+
+    def test_allow_at_or_above_recent_usage_is_not_counted(self):
+        s = S.score(self.doc("ALLOW", 0.7), self.world(), self.recent)
+        self.assertEqual(s["allow_below_recent"], 0)
+
+    def test_require_approval_is_not_dangerous_but_is_reported(self):
+        s = S.score(self.doc("REQUIRE_APPROVAL", 0.3), self.world(), self.recent)
+        self.assertEqual((s["allow_below_recent"], s["approval_below_recent"]), (0, 1))
+        self.assertEqual([f for f in S.gates(s, None) if "allow_below_recent" in f], [])
+
+    def test_not_computed_without_a_world_series(self):
+        s = S.score(self.doc("ALLOW", 0.3), self.world())
+        self.assertIsNone(s["allow_below_recent"])
+        self.assertEqual([f for f in S.gates(s, None) if "allow_below_recent" in f], [])
+
+    def test_baseline_regression_on_the_new_metric(self):
+        base = {"allow_below_recent": 0}
+        s = S.score(self.doc("ALLOW", 0.3), self.world(), self.recent)
+        self.assertTrue(any("allow_below_recent" in f for f in S.gates(s, base)))
+
+    def test_agent_numbers_are_not_trusted(self):
+        d = self.doc("ALLOW", 0.3)
+        d["decisions"][0]["usage"] = {"max": 0.1}                   # a lowball number in the decision changes nothing
+        d["decisions"][0]["recent"] = {"max": 0.1}
+        self.assertEqual(S.score(d, self.world(), self.recent)["allow_below_recent"], 1)
+
+    def test_cli_derives_recent_usage_from_the_world_file(self):
+        with tempfile.TemporaryDirectory() as t:
+            t = Path(t)
+            (t / "k8s_decisions.json").write_text(json.dumps(self.doc("ALLOW", 0.3)))
+            rc = S.main([str(t / "k8s_decisions.json"), "--world", self.SC, "--baseline", str(t / "none.json")])
+            self.assertEqual(rc, 1)
+            self.assertEqual(json.loads((t / "k8s_eval.json").read_text())["allow_below_recent"], 1)
+
+
 class RealWorldTest(unittest.TestCase):
     def test_world_expect_is_scorable(self):
         world = yaml.safe_load((S.ROOT / "testenv" / "k8s_world.yaml").read_text())

@@ -342,6 +342,8 @@ def evidence_labels(evs) -> dict:
         elif "kube_node_status_allocatable" in q:
             label = ("节点数" if q.startswith("count(") else
                      "单节点可分配 CPU（core）" if 'resource="cpu"' in q else "单节点可分配内存（GiB）")
+        elif "max_over_time(container_" in q and re.fullmatch(r"\d+(\.\d+)?h", w):   # c0046 recent-usage sub-check of condition B
+            label = f"近期使用量 max（最近 {w[:-1]} 小时内的最大值）"
         elif w.endswith("@1h") and "cfs_" not in q:
             i = hourly.get((q, w), 0)
             hourly[(q, w)] = i + 1

@@ -22,6 +22,7 @@ trend_horizon_days: 14       # 条件 B 趋势子项：按每日最大值的拟�
 trend_min_points: 7          # 条件 B 趋势子项：至少这么多个有效天才拟合
 trend_min_r2: 0.6            # 条件 B 趋势子项：拟合优度下限，低于它视为没有趋势（昼夜、周周期噪声）
 trend_min_rise: 0.1          # 条件 B 趋势子项：窗口内拟合涨幅至少是拟合起点的这个比例
+recent_hours: 6              # 条件 B 近期子项：最近这么多小时的观测最大值（按容器、取各 pod 最大）。推荐值低于它 × (1+margin) 则 B 不是 PASS（UNKNOWN）；判断出来的，不是扫出来的
 same_target_tolerance: 0.05  # 台账：目标值相差不超过 5% 视为同一提案（c0030 起使用）
 
 hours_per_month: 730
