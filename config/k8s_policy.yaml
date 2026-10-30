@@ -5,6 +5,7 @@ window_days: 14              # 取数窗口
 min_days: 14                 # 条件 A：有效天数下限
 min_coverage: 0.9            # 条件 A：窗口内有数据的小时占比下限
 valid_day_min_hours: 12      # 一天里至少这么多个小时有数据才算有效天
+stale_days: 3                # 条件 A：最后一个样本距 as_of 超过这么多天（或窗口内没有样本）= 最近无数据，判 UNKNOWN；workload 发现用 window_days 的窗口，所以这类 workload 不会消失
 
 cpu_headroom: 0.3            # 推荐：p99 * (1 + cpu_headroom)
 cpu_step: 0.05               # 向上取整的粒度，单位 core

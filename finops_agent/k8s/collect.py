@@ -180,7 +180,8 @@ class Collector:
 
     # ---- discovery ------------------------------------------------------------
     def workloads(self):
-        rows = self.prom.query(f"max by (namespace, workload, {TEAM_LABEL})({DEPLOY_REPLICAS})", self.t)
+        # window discovery (c0043): a workload whose samples stopped before as_of must still get a decision (UNKNOWN by condition A)
+        rows = self.prom.query(f"max by (namespace, workload, {TEAM_LABEL})(max_over_time({DEPLOY_REPLICAS}[{self.win}]))", self.t)
         found = {(m["metric"].get("namespace", ""), m["metric"]["workload"]): m["metric"].get(TEAM_LABEL, "") for m in rows}
         return [(ns, wl, found[(ns, wl)]) for ns, wl in sorted(found)]
 
@@ -297,6 +298,11 @@ class Collector:
         peak = sorted(h for h, x in means.items() if means and x >= 0.9 * max(means.values())) if means else []
         w = f"{self.win}@1h"
         m["valid_days"], m["coverage"], m["peak_hours"] = (hq, w, float(valid_days)), (hq, w, round(coverage, 6)), (hq, w, peak)
+        # freshness (c0043): age of the newest hourly sample at as_of; None = no sample in the whole window. Not evidence: it only
+        # shows up in condition A's text when the workload is stale, so fresh workloads' decisions are unchanged.
+        age = (self.t - max(series)) / 86400 if series else None
+        m["freshness"] = {"stale_days": self.policy.get("stale_days"), "last_sample_age_days": None if age is None else round(max(age, 0.0), 4),
+                          "stale": self.policy.get("stale_days") is not None and (age is None or age > self.policy["stale_days"])}
 
         throttle = None
         if cpu:
@@ -359,6 +365,7 @@ def collect_facts(prom: Prom, policy: dict, as_of: float | None = None, pricing:
                           "throttle_peak": None if throttle is None else round(throttle, 6),
                           "oom_events": shared["oom"][2], "trend": trend},
                 "hpa": hpa,
+                "freshness": rm["freshness"],
                 "container": shared["container"],
                 "slo": {"burn_rate_1h": shared["burn"][2], "budget_remaining": shared["budget"][2],
                         "job_max_duration": shared["job"][2], "deadline_seconds": shared["deadline"][2]},
