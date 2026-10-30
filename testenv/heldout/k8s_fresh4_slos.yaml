@@ -1,0 +1,19 @@
+# SLO 目录（c0045，第四个预注册世界）。形状同 testenv/k8s_slos.yaml；有 `slo` 块的 workload 恰好是这里的条目，数值逐项相等。
+# audit-trail 不在目录里（未定义 SLO）。
+apiVersion: finops.local/v1
+kind: SLOCatalog
+metadata: {name: finops-k8s-synth-fresh4}
+slos:
+  - {namespace: edge, workload: geo-lookup, objectives: {availability: 0.999, p99_seconds: 0.25}}
+  - {namespace: edge, workload: edge-proxy, objectives: {availability: 0.999, p99_seconds: 0.25}}
+  - {namespace: finance, workload: ledger-sync, objectives: {availability: 0.999, p99_seconds: 0.5}}
+  - {namespace: risk, workload: fraud-scorer, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: media, workload: thumbnail-svc, objectives: {availability: 0.995, p99_seconds: 0.8}}
+  - {namespace: edge, workload: edge-gateway, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: pay, workload: settle-api, objectives: {availability: 0.9995, p99_seconds: 0.4}}
+  - {namespace: data, workload: reconcile-nightly, deadline_seconds: 7200}
+  - {namespace: search, workload: catalog-index, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: search, workload: ranking-api, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: shop, workload: cart-archiver, objectives: {availability: 0.995, p99_seconds: 0.8}}
+  - {namespace: shop, workload: recommend-svc, objectives: {availability: 0.999, p99_seconds: 0.4}}
+  - {namespace: search, workload: search-suggest, objectives: {availability: 0.999, p99_seconds: 0.3}}

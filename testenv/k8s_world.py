@@ -41,6 +41,10 @@ Additive extensions (c0042, used by the third pre-registered world; change no ex
   mem spiky   {base_gib, spike_gib, spike_prob, jitter}   rare isolated memory spikes: p99 stays at base, max is the spike
   profile.slo_metrics: orphan                              slo_* series are emitted although the workload has no slo block
                                                            (and so is absent from the SLO catalog): metrics must not stand in for a definition
+
+Additive extension (c0045, used by the fourth pre-registered world; changes no existing series):
+  cpu daily_burst   {base, jitter, burst_hour, burst_samples, burst_value}   a short scheduled burst every day (cron, cache refresh):
+                                                                           a few samples a day, so p99 stays at base while the burst is real
 """
 from __future__ import annotations
 
@@ -233,6 +237,9 @@ def cpu_cores(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float
             u = (p["peak_value"] if on else p["base"]) * (1 + j)
         elif p["kind"] == "spiky":
             u = (p["spike_value"] if spike_rng.random() < p["spike_prob"] else p["base"]) * (1 + j)
+        elif p["kind"] == "daily_burst":
+            on = p["burst_hour"] <= h < p["burst_hour"] + p["burst_samples"] * STEP / 3600
+            u = (p["burst_value"] if on else p["base"]) * (1 + j)
         elif p["kind"] == "trend":
             u = (p["start"] + p["slope_per_day"] * (t - world.t0) / 86400) * (1 + j)
         else:
