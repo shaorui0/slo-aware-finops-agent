@@ -328,6 +328,8 @@ flowchart TB
 | c0042-k8s-fresh3-freeze | 10-30 | 第三个盲写预注册 K8s 世界（12 个 workload，9 类难点）并冻结 | 盲写世界的价值取决于作者没有被 agent 当前的错误引导 | [报告](reports/0042-k8s-fresh3-freeze.html) · [笔记](notes/blog/0042-k8s-fresh3-freeze.md) |
 | c0043-k8s-silent-discovery | 10-30 | 修「静默丢 workload」：发现改窗口口径，条件 A 增加「最近 N 天无数据」子项（`stale_days`），过期 workload 判 UNKNOWN 并进日报；基础世界决策与盒带不变，unsafe_allow 0 | 缺数据要显式要从发现阶段开始，沉默发生在最上游 | [报告](reports/0043-k8s-silent-discovery.html) · [笔记](notes/blog/0043-k8s-silent-discovery.md) |
 | c0044-k8s-fresh3-eval | 10-30 | 第三个预注册世界评估一次：verdict_accuracy 0.9583、unsafe_allow 0、unknown_recall 1.0；唯一失分是近期 cpu 阶跃后仍放行降配（按定义不算 unsafe，按后果算）；成绩单加第五列 | 每修一类失败，样本外就暴露下一类；危险指标的定义本身也要被评估 | [报告](reports/0044-k8s-fresh3-eval.html) · [笔记](notes/blog/0044-k8s-fresh3-eval.md) |
+| c0045-k8s-fresh4-freeze | 10-30 | 第四个预注册（盲写）K8s 世界：14 个 workload、11 个难点分属 8 类，FFD 复算 realizable，冻结后只评一次 | 第四个盲世界：不知道 agent 错在哪里，才能度量修复 | [报告](reports/0045-k8s-fresh4-freeze.html) · [笔记](notes/blog/0045-k8s-fresh4-freeze.md) |
+| c0046-k8s-recent-regime | 10-30 | 修「近期阶跃仍 ALLOW」：条件 B 增加近期用量子项（最近 6 小时观测最大值 × (1+margin) 高于推荐值则 UNKNOWN→REQUIRE_APPROVAL，两种资源都适用），打分器新增 `allow_below_recent` 硬闸门（世界真实用量，不读 agent 数字）；基础世界决策与盒带不变，unsafe_allow 0 | 完整、可信的 14 天统计也可能描述一个已经不存在的状态；安全指标要从世界重新生成，不能信 agent 自述 | [报告](reports/0046-k8s-recent-regime.html) · [笔记](notes/blog/0046-k8s-recent-regime.md) |
 
 ### 2.5 目录
 
