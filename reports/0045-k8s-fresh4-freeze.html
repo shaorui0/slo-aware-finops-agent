@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0045-k8s-fresh4-freeze</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0045-k8s-fresh4-freeze</h1>
+</header>
+<h2 id="做了什么">做了什么</h2>
+<p>冻结第四个预注册 K8s
+世界（<code>testenv/heldout/k8s_fresh4_world.yaml</code> 与
+<code>k8s_fresh4_slos.yaml</code>），盲写：没有读 agent
+代码、策略配置、评估结果与此前的预注册世界。修复合入后只评一次。本
+change 没有运行 agent，也没有运行任何评分器。</p>
+<h2 id="世界">世界</h2>
+<p>14 个 workload，节点 r6i.xlarge（3.9 core / 29.5 GiB，0.252
+USD/h），<code>nodes.count</code> = 14，FFD 对六种排序键都得 14。</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>workload</th>
+<th>难点类别</th>
+<th>cpu</th>
+<th>memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>geo-lookup</td>
+<td>易</td>
+<td>ALLOW</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>audit-trail</td>
+<td>易（无 SLO）</td>
+<td>REQUIRE_APPROVAL</td>
+<td>REQUIRE_APPROVAL</td>
+</tr>
+<tr>
+<td>edge-proxy</td>
+<td>易（已合身）</td>
+<td>NOOP</td>
+<td>NOOP</td>
+</tr>
+<tr>
+<td>ledger-sync</td>
+<td>数据质量（中间 10 天空洞）</td>
+<td>UNKNOWN</td>
+<td>UNKNOWN</td>
+</tr>
+<tr>
+<td>fraud-scorer</td>
+<td>流量形状（pod 倾斜）</td>
+<td>ALLOW</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>thumbnail-svc</td>
+<td>流量形状（cron 脉冲，judgment_conflict）</td>
+<td>ALLOW</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>edge-gateway</td>
+<td>自动扩缩耦合（HPA 顶到 max 且节流）</td>
+<td>DENY</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>settle-api</td>
+<td>SLO（预算健康但燃烧率 &gt; 1）</td>
+<td>DENY</td>
+<td>DENY</td>
+</tr>
+<tr>
+<td>reconcile-nightly</td>
+<td>SLO（最坏一次 job 到 deadline 的 98%）</td>
+<td>DENY</td>
+<td>DENY</td>
+</tr>
+<tr>
+<td>catalog-index</td>
+<td>装箱（最大内存削减 realizable 0）</td>
+<td>ALLOW</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>ranking-api</td>
+<td>装箱（小 cpu 削减腾出整节点）</td>
+<td>ALLOW</td>
+<td>ALLOW</td>
+</tr>
+<tr>
+<td>cart-archiver</td>
+<td>生命周期（最后样本 5 天前）</td>
+<td>UNKNOWN</td>
+<td>UNKNOWN</td>
+</tr>
+<tr>
+<td>recommend-svc</td>
+<td>request 方向（用量远超 request）</td>
+<td>NOOP</td>
+<td>NOOP</td>
+</tr>
+<tr>
+<td>search-suggest</td>
+<td>时间制度（12 小时前的流量台阶）</td>
+<td>DENY</td>
+<td>ALLOW</td>
+</tr>
+</tbody>
+</table>
+<h2 id="验收">验收</h2>
+<ul>
+<li><code>python3 -W ignore -m unittest discover -t . -s testenv -p 'test_*.py'</code>：151
+个测试通过。</li>
+<li><code>python3 tools/check_rules.py --docs</code> 通过。</li>
+<li>指标服务在空闲端口起来，抽查两条查询正常。</li>
+<li>基础世界序列 sha256 不变。</li>
+<li>冻结提交
+<code>abda3c37ca0d1e670b893c1507381caa110f0cce</code>；世界文件 sha256
+<code>05ef97dae2c202f510c20fcfc12659e4ceb950f371d2740f78797997b46b8a09</code>。</li>
+</ul>
+<p>详见
+<code>openspec/changes/c0045-k8s-fresh4-freeze/evidence.md</code>，含盲写协议逐条自查与两处无意接触的如实记录。</p>
+</body>
+</html>
