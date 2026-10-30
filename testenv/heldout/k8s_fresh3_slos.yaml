@@ -1,0 +1,17 @@
+# SLO catalog for the third pre-registered world (c0042). Same shape as testenv/k8s_slos.yaml.
+# loyalty-points is deliberately absent: it has slo_* series but no defined SLO.
+apiVersion: finops.local/v1
+kind: SLOCatalog
+metadata: {name: finops-k8s-synth-3}
+slos:
+  - {namespace: payments, workload: ledger-gateway, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: marketing, workload: promo-renderer, objectives: {availability: 0.999, p99_seconds: 0.4}}
+  - {namespace: compliance, workload: audit-trailer, objectives: {availability: 0.999, p99_seconds: 0.5}}
+  - {namespace: media, workload: thumbnail-farm, objectives: {availability: 0.999, p99_seconds: 0.5}}
+  - {namespace: messaging, workload: fanout-worker, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: platform, workload: geo-resolver, objectives: {availability: 0.999, p99_seconds: 0.3}}
+  - {namespace: integrations, workload: webhook-relay, objectives: {availability: 0.995, p99_seconds: 1.0}}
+  - {namespace: risk, workload: scoring-engine, objectives: {availability: 0.999, p99_seconds: 0.25}}
+  - {namespace: documents, workload: pdf-assembler, objectives: {availability: 0.999, p99_seconds: 0.8}}
+  - {namespace: payments, workload: ledger-reconcile, deadline_seconds: 3600}
+  - {namespace: trading, workload: quote-cache, objectives: {availability: 0.999, p99_seconds: 0.2}}

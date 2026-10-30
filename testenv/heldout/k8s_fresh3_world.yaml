@@ -1,0 +1,246 @@
+# Third pre-registered K8s world (c0042). Written blind, frozen before the fix lands, scored once afterwards.
+# Schema: c0027 k8s-mainline spec; SLO catalog: c0031. Units: cpu in cores, memory in GiB.
+# request_range follows the contract formula (cpu = p99 per-pod x1.3 ceil 0.05; memory = max working set x1.2 ceil 64Mi);
+# where SRE judgment disagrees, the entry carries judgment_conflict: true and says so in `why`.
+cluster:
+  name: finops-k8s-synth-3
+  period: {start: "2026-10-09T00:00:00Z", end: "2026-10-30T00:00:00Z"}   # 21 days
+  step_seconds: 300
+
+pricing: {node_type: c6i.2xlarge, node_hour_usd: 0.34, cpu_core_hour_usd: 0.0285, mem_gib_hour_usd: 0.0087}
+
+nodes: {count: 7, min: 3, max: 10, allocatable: {cpu: 7.6, memory_gib: 14.0}}
+
+workloads:
+  # hard: per-pod skew. One shard is 3x hotter than another; the mean over pods under-sizes the hot pod.
+  - name: ledger-gateway
+    namespace: payments
+    team: team-ledger
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "2", memory: "3Gi"}, limits: {cpu: "3", memory: "4Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      per_pod_spread: 0.5
+      cpu: {kind: flat, base: 0.30, jitter: 0.06}
+      mem: {kind: flat, base_gib: 1.1, jitter: 0.02}
+      http: {rps: 25, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.6, 0.7], why: "pods are uneven (0.5x / 1x / 1.5x of the base): the hottest pod peaks near 0.48 core, and every pod gets the same request, so the hot pod sets the size, not the mean"}
+      memory: {verdict: ALLOW, request_range: [1.3, 1.5], why: "memory is even across pods, max working set ~1.12 GiB against 3 GiB reserved"}
+
+  # hard: a level shift three hours before the end of the window; p99 over 21 days has not seen it yet.
+  - name: promo-renderer
+    namespace: marketing
+    team: team-growth
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1500m", memory: "2Gi"}, limits: {cpu: "3", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.4}
+    profile:
+      cpu: {kind: flat, base: 0.20, jitter: 0.05}
+      mem: {kind: flat, base_gib: 0.8, jitter: 0.02}
+      http: {rps: 10, p99_base: 0.12}
+    data_days: 21
+    events:
+      - {type: load, at: "2026-10-29T21:00:00Z", factor: 3.0}
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.3, 0.35], judgment_conflict: true, why: "judgment: cpu tripled three hours ago (a launch), so p99 over 21 days describes a regime that no longer exists and the new one has 3h of data; contract: A passes on days and coverage, p99 x1.3 gives ~0.3. Range follows the contract; a human must look before shrinking"}
+      memory: {verdict: ALLOW, request_range: [1.0, 1.2], why: "memory did not move with the cpu shift: flat ~0.8 GiB"}
+
+  # hard: data quality. 21 calendar days of window, but a 9-day hole in the middle leaves only 12 days of samples.
+  - name: audit-trailer
+    namespace: compliance
+    team: team-risk
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "4Gi"}, limits: {cpu: "2", memory: "6Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.5}
+    profile:
+      cpu: {kind: flat, base: 0.25, jitter: 0.06}
+      mem: {kind: flat, base_gib: 1.5, jitter: 0.02}
+      http: {rps: 6, p99_base: 0.15}
+      gaps:
+        - {from: "2026-10-14T00:00:00Z", to: "2026-10-23T00:00:00Z"}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.33, 0.4], why: "first and last sample are 21 days apart, but only 12 days have samples (a 9-day hole in the middle): below min_days, A is UNKNOWN"}
+      memory: {verdict: UNKNOWN, request_range: [1.8, 2.1], why: "same hole, 12 valid days (A unknown)"}
+
+  # hard: averages hide micro-burst throttling. 5-minute mean is 40% of request, but ~25% of CFS periods are throttled.
+  - name: thumbnail-farm
+    namespace: media
+    team: team-content
+    kind: Deployment
+    replicas: 4
+    container: {name: app, requests: {cpu: "1", memory: "1Gi"}, limits: {cpu: "1", memory: "2Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.5}
+    profile:
+      cpu: {kind: flat, base: 0.40, jitter: 0.05}
+      mem: {kind: flat, base_gib: 0.45, jitter: 0.02}
+      throttle: {onset: 0.15, slope: 1.0, cap: 0.6}
+      http: {rps: 30, p99_base: 0.15, p99_per_throttle: 0.6}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: DENY, request_range: [0.55, 0.65], why: "utilization looks fine at 40% but the container is throttled in roughly a quarter of periods all day (limit == request, bursts shorter than the 5m mean): the B guard on throttling fails, do not cut"}
+      memory: {verdict: ALLOW, request_range: [0.55, 0.65], why: "memory is flat ~0.46 GiB and has nothing to do with the cpu throttling"}
+
+  # hard: coupling plus verdict order. HPA is already at its max replicas and pods run above the HPA target.
+  - name: fanout-worker
+    namespace: messaging
+    team: team-platform
+    kind: Deployment
+    replicas: 4
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    hpa: {metric: cpu, target_utilization: 60, min: 2, max: 4}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.90, jitter: 0.05}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.02}
+      http: {rps: 12, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: NOOP, request_range: [1.25, 1.35], why: "pods already run at ~90% of request against a 60% HPA target and the HPA is stuck at max replicas: the formula recommends going UP, so there is nothing to lower (NOOP precedes the HPA approval rule); the human takeaway is to raise the request or the max"}
+      memory: {verdict: ALLOW, request_range: [0.85, 1.0], why: "the HPA metric is cpu, memory is not coupled; working set ~0.72 GiB of 2 GiB"}
+
+  # hard: metrics are not a definition. slo_* series exist, but there is no SLO in the catalog.
+  - name: loyalty-points
+    namespace: growth
+    team: team-growth
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    profile:
+      cpu: {kind: flat, base: 0.12, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.7, jitter: 0.02}
+      slo_metrics: orphan
+      http: {rps: 4, p99_base: 0.12}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: REQUIRE_APPROVAL, request_range: [0.18, 0.22], why: "healthy-looking slo_burn_rate_1h / budget series exist but no SLO is defined in the catalog: C is UNKNOWN, a recording rule is not a target"}
+      memory: {verdict: REQUIRE_APPROVAL, request_range: [0.85, 1.0], why: "same: C UNKNOWN, A and B pass"}
+
+  # hard: memory sits at 97% of its limit with no OOM event yet.
+  - name: geo-resolver
+    namespace: platform
+    team: team-platform
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "2Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.3}
+    profile:
+      cpu: {kind: flat, base: 0.35, jitter: 0.06}
+      mem: {kind: flat, base_gib: 1.94, jitter: 0.005}
+      http: {rps: 15, p99_base: 0.1}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.45, 0.55], why: "cpu is at 35% and has no peak; the memory problem is a separate resource"}
+      memory: {verdict: DENY, request_range: [2.3, 2.6], range_note: "upward: the formula value is above the current request", why: "working set is ~97% of the limit although nothing has been killed yet: the OOM guard fails on the current state; the formula wants more than the current request, so it is under-provisioned, not wasteful"}
+
+  # easy: odd units, comfortable.
+  - name: webhook-relay
+    namespace: integrations
+    team: team-platform
+    kind: Deployment
+    replicas: 3
+    container: {name: app, requests: {cpu: "750m", memory: "768Mi"}, limits: {cpu: "1500m", memory: "1536Mi"}}
+    slo: {availability: 0.995, p99_seconds: 1.0}
+    profile:
+      cpu: {kind: flat, base: 0.06, jitter: 0.10}
+      mem: {kind: flat, base_gib: 0.2, jitter: 0.03}
+      http: {rps: 3, p99_base: 0.2}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.09, 0.11], why: "p99 ~0.07 core against 750m reserved, no peak, SLO healthy"}
+      memory: {verdict: ALLOW, request_range: [0.25, 0.3], why: "max working set ~0.21 GiB against 768Mi reserved"}
+
+  # easy-ish: cpu under-requested (usage above request, limit is high): nothing to lower.
+  - name: scoring-engine
+    namespace: risk
+    team: team-risk
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "500m", memory: "6Gi"}, limits: {cpu: "4", memory: "8Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.25}
+    profile:
+      cpu: {kind: flat, base: 1.6, jitter: 0.05}
+      mem: {kind: flat, base_gib: 3.0, jitter: 0.02}
+      http: {rps: 40, p99_base: 0.08}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: NOOP, request_range: [2.1, 2.3], why: "pods use ~3x their cpu request (they burst into the limit headroom): the request is too low, the recommendation goes up"}
+      memory: {verdict: ALLOW, request_range: [3.6, 4.2], why: "max working set ~3.1 GiB against 6 GiB reserved"}
+
+  # hard: rare memory spikes. p99 of the working set is the base; the max is 3x higher.
+  - name: pdf-assembler
+    namespace: documents
+    team: team-content
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "2", memory: "6Gi"}, limits: {cpu: "4", memory: "6Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.8}
+    profile:
+      cpu: {kind: flat, base: 0.5, jitter: 0.06}
+      mem: {kind: spiky, base_gib: 1.0, spike_gib: 3.2, spike_prob: 0.004, jitter: 0.02}
+      http: {rps: 5, p99_base: 0.3}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [0.65, 0.75], realizable_usd_month: [0, 0], why: "cpu is flat at ~25% of request and safe to cut, but the cluster is memory-bound (6 GiB pods): the 7 nodes stay (first-fit decreasing by memory then cpu), realizable savings are 0"}
+      memory: {verdict: ALLOW, request_range: [3.85, 4.15], why: "a few large documents push the working set to ~3.2 GiB for single samples (<1% of samples, so p99 stays ~1 GiB): the request must cover the max, not p99; max x1.2 is ~3.9 GiB"}
+
+  # easy-ish: batch with a comfortable deadline.
+  - name: ledger-reconcile
+    namespace: payments
+    team: team-ledger
+    kind: Deployment
+    replicas: 1
+    container: {name: job, requests: {cpu: "4", memory: "6Gi"}, limits: {cpu: "4", memory: "6Gi"}}
+    slo: {deadline_seconds: 3600}
+    profile:
+      cpu: {kind: batch, start_hour: 3, hours: 1, active: 1.5, idle: 0.02, jitter: 0.03}
+      mem: {kind: batch, idle_gib: 0.2, active_gib: 2.4, jitter: 0.02}
+      job: {base_seconds: 1500, jitter_seconds: 100, finish_hour: 4.0}
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: ALLOW, request_range: [1.95, 2.15], why: "one hour a night at ~1.5 cores of a 4-core request; job takes ~42% of its 3600s deadline"}
+      memory: {verdict: ALLOW, request_range: [2.9, 3.3], why: "active working set ~2.4 GiB, request 6 GiB"}
+
+  # near threshold: 13 days of data, one short of min_days.
+  - name: quote-cache
+    namespace: trading
+    team: team-markets
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.999, p99_seconds: 0.2}
+    profile:
+      cpu: {kind: flat, base: 0.10, jitter: 0.08}
+      mem: {kind: flat, base_gib: 0.6, jitter: 0.03}
+      http: {rps: 20, p99_base: 0.06}
+    data_days: 13
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, request_range: [0.15, 0.2], why: "13 days of data, one short of min_days 14 (A unknown), even though the window looks clean"}
+      memory: {verdict: UNKNOWN, request_range: [0.7, 0.8], why: "13 days of data (A unknown)"}
+
+traps:
+  - {workload: ledger-gateway, why: "mean usage across pods under-sizes the hot pod; the per-pod p99 of the hottest pod is what the shared request must cover"}
+  - {workload: promo-renderer, why: "a level shift 3h ago is invisible to a 21-day p99; the window describes the old regime"}
+  - {workload: audit-trailer, why: "a 21-day span with a 9-day hole: 12 valid days, not 21"}
+  - {workload: thumbnail-farm, why: "40% average utilization but a quarter of periods throttled: look at throttling, not utilization"}
+  - {workload: fanout-worker, why: "HPA saturated at max replicas: the right direction is up, and NOOP must win over the HPA approval rule"}
+  - {workload: loyalty-points, why: "slo_* series without a catalog entry are not an SLO"}
+  - {workload: geo-resolver, why: "97% of the memory limit with no OOM yet: the guard is the ratio, not the event"}
+  - {workload: pdf-assembler, why: "rare memory spikes: p99 of memory misses them, max does not"}
+  - {workload: quote-cache, why: "13 days is below 14 even if the data looks complete"}
