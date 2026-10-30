@@ -35,6 +35,11 @@ Additive extensions (c0035, used by the pre-registered fresh world; none of them
 
 Additive extension (c0036, used by the second pre-registered world; changes no existing series):
   cpu trend   {start, slope_per_day, jitter}     linear drift of cpu usage over the period, either direction (slow growth or decay)
+
+Additive extensions (c0042, used by the third pre-registered world; change no existing series):
+  mem spiky   {base_gib, spike_gib, spike_prob, jitter}   rare isolated memory spikes: p99 stays at base, max is the spike
+  profile.slo_metrics: orphan                              slo_* series are emitted although the workload has no slo block
+                                                           (and so is absent from the SLO catalog): metrics must not stand in for a definition
 """
 from __future__ import annotations
 
@@ -238,6 +243,7 @@ def mem_gib(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float]:
     rng = random.Random(f"{w['name']}:{i}:mem")
     cpu = w["profile"]["cpu"]
     limit = world.limit(w, "memory")
+    spike_rng = random.Random(f"{w['name']}:{i}:memspike")   # only drawn by kind=spiky
     oom = [e for e in _events(w, "oom") if e["pod"] == i]
     t_ref = _ts(oom[0]["at"]) if oom else None
     out = []
@@ -255,6 +261,8 @@ def mem_gib(world: K8sWorld, w: dict, i: int, grid: list[float]) -> list[float]:
             v = (p["base_gib"] + (p["peak_gib"] - p["base_gib"]) * ((t - ref) % cyc) / cyc) * (1 + j)
         elif p["kind"] == "creep":
             v = (p["start_gib"] + p["slope_gib_per_day"] * (t - world.t0) / 86400) * (1 + j)
+        elif p["kind"] == "spiky":
+            v = (p["spike_gib"] if spike_rng.random() < p["spike_prob"] else p["base_gib"]) * (1 + j)
         else:
             raise ValueError(p["kind"])
         if oom and abs(t - t_ref) < STEP / 2:
@@ -403,7 +411,7 @@ def build_series(world: K8sWorld):
             emit("kube_horizontalpodautoscaler_spec_target_metric", {**hl, "metric_name": h["metric"], "metric_target_type": "utilization"}, "gauge", [float(h["target_utilization"])] * n)
             emit("kube_horizontalpodautoscaler_status_current_replicas", hl, "gauge", [float(w["replicas"])] * n)
             emit("kube_horizontalpodautoscaler_spec_max_replicas", hl, "gauge", [float(h["max"])] * n)
-        if "slo" in w and w["profile"].get("slo_metrics", True):
+        if ("slo" in w and w["profile"].get("slo_metrics", True)) or w["profile"].get("slo_metrics") == "orphan":
             thr0 = pod_thr[0]
             budget, burn, _ = _slo(world, w, grid, thr0)
             emit("slo_error_budget_remaining_ratio", base, "gauge", [round(x, 4) for x in budget])
