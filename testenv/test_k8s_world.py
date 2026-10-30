@@ -384,5 +384,23 @@ class Drift(unittest.TestCase):
         self.assertGreater(p(day3.t1 - 1) / p(base.t1 - 1), 1.05)
 
 
+class StaleScenario(unittest.TestCase):
+    """c0043: add_workloads is additive; the stale-workload scenario leaves every base series as it was."""
+    SC = Path(kw.__file__).parent / "k8s_scenarios" / "stale_workload.yaml"
+
+    def test_base_series_are_unchanged_and_the_new_workload_stops_early(self):
+        base = kw.load()
+        sc = kw.load(self.SC)
+        self.assertEqual((sc.t0, sc.t1), (base.t0, base.t1))
+        _, a = kw.build_series(base)
+        g, b = kw.build_series(sc)
+        extra = [x for x in b if x[0].get("workload") == "edge-sync"]
+        self.assertEqual([x for x in b if x[0].get("workload") != "edge-sync"], a)
+        cpu = next(v for l, _, v in extra if l["__name__"] == "container_cpu_usage_cores")
+        last = max(t for t, x in zip(g, cpu) if x is not None)
+        self.assertEqual(last, kw._ts("2026-10-21T00:00:00Z") - kw.STEP)
+        self.assertEqual(g[-1] - last, 5 * 86400)
+
+
 if __name__ == "__main__":
     unittest.main()

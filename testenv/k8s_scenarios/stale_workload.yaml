@@ -1,0 +1,22 @@
+# c0043: the base world plus one workload whose metrics stopped 5 days before the end of the period (collector died / scrape lost).
+# Before c0043 the agent's instant-query discovery dropped it silently; now it must appear as UNKNOWN ("最近 3 天无数据").
+# Serve with:  python3 -m testenv.metrics_server --world testenv/k8s_scenarios/stale_workload.yaml
+scenario: {name: stale_workload, base: testenv/k8s_world.yaml}
+add_workloads:
+  - name: edge-sync
+    namespace: ops
+    team: team-platform
+    kind: Deployment
+    replicas: 2
+    container: {name: app, requests: {cpu: "1", memory: "2Gi"}, limits: {cpu: "2", memory: "3Gi"}}
+    slo: {availability: 0.99}
+    profile:
+      cpu: {kind: flat, base: 0.2, jitter: 0.05}
+      mem: {kind: flat, base_gib: 0.8, jitter: 0.03}
+      http: {rps: 10, p99_base: 0.2}
+      gaps: [{from: "2026-10-21T00:00:00Z", to: "2026-10-27T00:00:00Z"}]
+    data_days: 21
+    events: []
+    expect:
+      cpu: {verdict: UNKNOWN, why: "no samples in the last 5 days: condition A UNKNOWN (stale)"}
+      memory: {verdict: UNKNOWN, why: "no samples in the last 5 days: condition A UNKNOWN (stale)"}

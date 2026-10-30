@@ -51,6 +51,11 @@ def cond_a(f, rec, policy):
     key = "p99" if res == "cpu" else "max"
     days, cov = u.get("valid_days") or 0, u.get("coverage") or 0.0
     unknowns = []
+    fr = f.get("freshness") or {}
+    if fr.get("stale"):   # c0043: no recent samples. Explicit, never silent; A is not PASS so the verdict is UNKNOWN
+        age, sd = fr.get("last_sample_age_days"), fr["stale_days"]
+        seen = f"最后一个样本在 {age:g} 天前" if age is not None else f"窗口 {policy['window_days']} 天内没有样本"
+        unknowns.append((f"最近 {sd:g} 天无数据（{seen}）", f"最近 {sd:g} 天无数据（{seen}）：需要恢复{label}使用数据的采集，或确认该 workload 已下线"))
     if f["current"].get("request") is None:
         unknowns.append(("缺少当前 request", "需要当前 request（kube_pod_container_resource_requests）"))
     if u.get(key) is None:

@@ -15,7 +15,8 @@ Drift / "day 3" runs. Two equivalent ways, pick one:
      `python3 -m testenv.metrics_server --world testenv/k8s_scenarios/drift_day3.yaml` serves it;
      `--as-of 2026-10-26T00:00:00Z` on the same file reproduces the day-1 world.
 Scenario schema: `scenario: {name, base}`, optional `cluster: {period: {end}}`, and
-`add_events: {<workload>: [event, ...]}` appended to that workload's events.
+`add_events: {<workload>: [event, ...]}` appended to that workload's events, and (c0043)
+`add_workloads: [<workload>, ...]` appended to the base world's workloads (e.g. one whose samples stop days before as_of).
 
 Event types (all absolute timestamps):
   load      {at, factor}                    multiplies cpu usage and request rate from `at`
@@ -151,6 +152,8 @@ def read_world(path=None) -> dict:
         for name, evs in (raw.get("add_events") or {}).items():
             wl = next(x for x in w["workloads"] if x["name"] == name)
             wl.setdefault("events", []).extend(copy.deepcopy(evs))
+        for wl in raw.get("add_workloads") or []:   # c0043, additive: whole extra workloads (a scenario without the key is unchanged)
+            w["workloads"].append(copy.deepcopy(wl))
         w["scenario"] = raw["scenario"]
         return w
     return raw
