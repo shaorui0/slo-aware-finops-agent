@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0043-k8s-silent-discovery</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0043-k8s-silent-discovery</h1>
+</header>
+<h2 id="问题">问题</h2>
+<p><code>collect.py</code> 用 as_of 时刻的瞬时查询发现
+workload。窗口前段有数据、最近几天没有的 workload
+在发现阶段消失：没有决策、没有
+UNKNOWN，日报里也看不到（<code>eval/EXPERIMENTS.md</code> §9.3 的
+edge-collector）。</p>
+<h2 id="改了什么">改了什么</h2>
+<ul>
+<li>发现：<code>max by (namespace, workload, team)(max_over_time(kube_deployment_spec_replicas[14d]))</code>。</li>
+<li>条件 A：新增「近期有数据」子项。最后一个逐小时样本距 as_of 超过
+<code>stale_days</code>（<code>config/k8s_policy.yaml</code>，默认
+3）天，或窗口内无样本，则 A = UNKNOWN，<code>why</code> 与
+<code>unknown_needs</code> 写明「最近 3 天无数据」。</li>
+<li>verdict 顺序不变，A 非 PASS 即 UNKNOWN，永不为 ALLOW /
+REQUIRE_APPROVAL。</li>
+<li>台账、叙述模板、日报无需改动，单测钉住。</li>
+</ul>
+<h2 id="前后对比">前后对比</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th></th>
+<th>修复前</th>
+<th>修复后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5 天无数据的 workload</td>
+<td>没有决策，日报里没有</td>
+<td>cpu、内存各一条 UNKNOWN，日报「被拒与数据不足」表有两行</td>
+</tr>
+<tr>
+<td>基础世界 <code>make k8s-eval</code></td>
+<td>verdict_accuracy 1.0，unsafe_allow 0</td>
+<td>相同，回放盒带全部命中（<code>narrative {'llm': 18}</code>）</td>
+</tr>
+<tr>
+<td>新测试</td>
+<td>2 FAIL + 2 ERROR</td>
+<td>9 个全部通过</td>
+</tr>
+</tbody>
+</table>
+<p>端到端（基础世界 + <code>edge-sync</code>，最后 5 天无样本）：</p>
+<pre><code>K-ops-edge-sync-cpu    UNKNOWN 最近 3 天无数据（最后一个样本在 5 天前）；缺少当前 request；有效天数 9 不足 14；样本覆盖率 0.65 低于 0.90</code></pre>
+<h2 id="没做">没做</h2>
+<ul>
+<li>窗口内完全没有样本的 workload 发现不了，需要外部清单。</li>
+<li>14 天 vs 28 天内存窗口的歧义不动。</li>
+<li>第二个预注册世界只作回归，未用于调参。</li>
+</ul>
+<p>证据：<code>openspec/changes/c0043-k8s-silent-discovery/evidence.md</code>。</p>
+</body>
+</html>
