@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>0046-k8s-recent-regime</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">0046-k8s-recent-regime</h1>
+</header>
+<h1
+id="c0046-k8s-recent-regime近期阶跃不能再被-allow">c0046-k8s-recent-regime：近期阶跃不能再被
+ALLOW</h1>
+<h2 id="改了什么">改了什么</h2>
+<ol type="1">
+<li><strong>条件 B
+增加「近期用量」子项（CPU、内存都适用）</strong>：最近
+<code>recent_hours</code>（默认 6）小时内的观测最大值 × (1+margin)
+高于推荐值，则 B = UNKNOWN，verdict = REQUIRE_APPROVAL。</li>
+<li><strong>新增证据条目</strong>（查询 + 窗口 +
+值），日报里有中文标签「近期使用量 max（最近 N
+小时内的最大值）」。只在子项构成因素时写入，其余决策与 LLM
+提示不变，盒带没有重录。</li>
+<li><strong>打分器新增硬闸门
+<code>allow_below_recent</code></strong>：ALLOW
+且推荐值低于世界里的真实近期用量。近期用量由打分器从世界文件重新生成，不读
+agent 的数字，不依赖 expect。</li>
+<li><strong>样本内用例</strong>
+<code>testenv/k8s_scenarios/recent_step.yaml</code>：CPU 最后 3
+小时翻三倍。</li>
+</ol>
+<h2 id="为什么">为什么</h2>
+<p>EXPERIMENTS §10：第三个预注册世界里 promo-renderer 的 CPU 在最后 3
+小时翻了三倍，推荐值 0.3 core 只有当前用量的一半，verdict 却是
+ALLOW。CPU 一侧的条件 B 只比 p99、看
+throttling；趋势守卫只管内存且看逐日峰值。旧打分器的
+<code>unsafe_allow</code> 只看期望裁决，这条期望是
+REQUIRE_APPROVAL，所以这次危险放行没有计入任何指标。</p>
+<h2 id="两个判断">两个判断</h2>
+<ul>
+<li><strong>UNKNOWN 而不是 FAIL。</strong>
+几小时的数据分不出「新常态」和「一次性尖峰」。FAIL 等于替人判了；UNKNOWN
+落到 REQUIRE_APPROVAL，人带着近期证据决定。证据明确（throttling、OOM）才
+FAIL。</li>
+<li><strong>REQUIRE_APPROVAL 不计入
+<code>allow_below_recent</code>。</strong>
+它前面有人工闸门，该指标衡量的是不经人看就放行的错误；它只作为信息项
+<code>approval_below_recent</code> 报告。</li>
+</ul>
+<h2 id="验收">验收</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>项目</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>修复前测试</td>
+<td>6 项失败，其中端到端 <code>'ALLOW' == 'ALLOW'</code>（推荐 0.3
+core，近期最大 0.63 core）</td>
+</tr>
+<tr>
+<td>修复后</td>
+<td>step-up-svc/cpu = REQUIRE_APPROVAL，B = UNKNOWN，引用近期值 0.63335
+core（证据 E24，窗口 6h）</td>
+</tr>
+<tr>
+<td><code>make k8s-eval</code></td>
+<td>unsafe_allow 0，allow_below_recent
+0，其余指标与基线一致（1.0），盒带无缺</td>
+</tr>
+<tr>
+<td><code>make k8s-days</code>、<code>make check</code></td>
+<td>通过</td>
+</tr>
+<tr>
+<td><code>make test</code></td>
+<td>除 <code>tools/test_build_index.py</code>（README 进度表尚无 c0046
+行）外全部通过</td>
+</tr>
+</tbody>
+</table>
+<p>基础世界 18 条决策逐条不变，没有一条含「近期」文字。</p>
+<p>日报样例（shop/step-up-svc · CPU）：</p>
+<blockquote>
+<p>条件 B 未知：近期用量高于推荐值：最近 6 小时观测最大 0.63335
+core，推荐 0.3 core 低于 0.63335 × (1+0.1)，用量可能刚发生变化，14
+天统计还描述不了新状态</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>证据</th>
+<th>含义</th>
+<th>值</th>
+<th>窗口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E24</td>
+<td>近期使用量 max（最近 6 小时内的最大值）</td>
+<td>0.6333</td>
+<td>6h</td>
+</tr>
+</tbody>
+</table>
+<h2 id="污染声明与限制">污染声明与限制</h2>
+<ul>
+<li><code>recent_hours = 6</code> 是读过 §10
+之后判断出来的，没有对第三个世界扫描或调参。用新打分器给 c0044
+当时的决策重新打分，<code>allow_below_recent</code> =
+1（promo-renderer/cpu）；用修复后的 agent 重跑该世界，该条为
+REQUIRE_APPROVAL。<strong>这两个数字都已污染，不是修复的证据</strong>；检验泛化需要第四个预注册世界。</li>
+<li>6 小时到约 3.4 天前的阶跃，这个子项抓不到。</li>
+<li>内存一侧：近期窗口是窗口 max
+的子集，真实数据下子项不会触发，只有合成事实的单测覆盖。</li>
+</ul>
+<p>证据全文：<code>openspec/changes/c0046-k8s-recent-regime/evidence.md</code>。</p>
+</body>
+</html>
