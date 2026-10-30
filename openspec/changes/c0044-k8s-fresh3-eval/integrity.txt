@@ -1,0 +1,12 @@
+$ git diff --stat 6450a8f HEAD -- testenv/heldout/k8s_fresh3_world.yaml testenv/heldout/k8s_fresh3_slos.yaml testenv/test_k8s_fresh3.py
+（空）
+$ shasum -a 256 testenv/heldout/k8s_fresh3_world.yaml testenv/heldout/k8s_fresh3_slos.yaml
+eb822fc50933b556e53bc3031d887de3930944f3dcde59d417c98e8ef6bc2a0b  testenv/heldout/k8s_fresh3_world.yaml
+108c0e40e75391f0e059bc31f2f85ded1aec8f76bb2e3da2ced182cd4f034ef2  testenv/heldout/k8s_fresh3_slos.yaml
+$ git merge-base --is-ancestor 6450a8f b5de59f && echo freeze-before-fix
+not-ancestor (parallel branches)
+6450a8f 2026-10-30 22:50:03 +0900 c0042-k8s-fresh3-freeze [3/4 freeze]: third pre-registered world, catalog, additive generator kinds, tests
+b5de59f 2026-10-30 22:47:23 +0900 c0043-k8s-silent-discovery [3/4 impl]: 窗口发现 + 条件 A 近期数据子项（stale_days），过期 workload 判 UNKNOWN；stale 场景与单测
+$ merge order on main
+87b907f merge c0043-k8s-silent-discovery（窗口发现，最近无数据判 UNKNOWN）
+0c40001 merge c0042-k8s-fresh3-freeze（第三预注册世界，修复前冻结 6450a8f）

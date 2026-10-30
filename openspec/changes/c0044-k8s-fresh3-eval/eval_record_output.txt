@@ -1,0 +1,7 @@
+k8s run k8s-fresh3 (as_of 2026-10-29T23:55:00Z): 24 decisions {'ALLOW': 14, 'DENY': 2, 'NOOP': 2, 'REQUIRE_APPROVAL': 2, 'UNKNOWN': 4}, plans 16, ledger {'new': 16, 'unchanged': 0, 'expired': 0, 'halted': 0, 'approved': 0, 'suppressed': 0, 'held': 0}, narrative {'llm': 24}
+runs/k8s-fresh3/k8s_decisions.json
+GATE FAILED: verdict_accuracy 0.9583 is worse than baseline 1.0
+{"verdict_accuracy": 0.9583, "unsafe_allow": 0, "unknown_recall": 1.0, "request_in_range": 1.0, "realizable_accuracy": 1.0}
+n={'expected': 24, 'decisions': 24, 'unknown_expected': 4, 'ranged': 16, 'realizable': 1} narrative={'llm': 24}
+wrong: promo-renderer/cpu got ALLOW expect REQUIRE_APPROVAL
+exit=1
