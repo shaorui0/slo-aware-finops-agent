@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>c0047 第四个预注册世界评估</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">c0047 第四个预注册世界评估</h1>
+</header>
+<blockquote>
+<p>c0047 验收：评估一次，结果原样记录；record
+与回放一致；评估后做了消融。证据见
+openspec/changes/c0047-k8s-fresh4-eval/evidence.md。</p>
+</blockquote>
+<h2 id="主线-k8s第四个预注册世界c0045-冻结c0047-评估一次">11. 主线
+K8s：第四个预注册世界（c0045 冻结，c0047 评估一次）</h2>
+<h3 id="协议与提交顺序">11.1 协议与提交顺序</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>事件</th>
+<th>提交</th>
+<th>时间</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第四个世界盲写并冻结</td>
+<td><code>abda3c3</code>（c0045 freeze）</td>
+<td>10-30 23:12</td>
+</tr>
+<tr>
+<td>合并进 main</td>
+<td><code>e169857</code></td>
+<td>修复派发前</td>
+</tr>
+<tr>
+<td>修「近期阶跃」的第一个提交（分支不含该世界）</td>
+<td><code>d659d0b</code>（c0046 proposal）</td>
+<td>10-30 23:23</td>
+</tr>
+<tr>
+<td>评估规则与污染披露写下</td>
+<td>c0047 proposal</td>
+<td>评估前</td>
+</tr>
+<tr>
+<td>评估一次</td>
+<td>c0047 eval</td>
+<td>本节</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>这一次「冻结早于修复」按提交顺序成立：世界冻结早于修复的派发和全部提交，修复的分支不含冻结提交（<code>git merge-base --is-ancestor abda3c3 c0046-k8s-recent-regime</code>
+为否）。</li>
+<li>评估时
+<code>git diff abda3c3 HEAD -- testenv/heldout/k8s_fresh4_* testenv/test_k8s_fresh4.py</code>
+为空；世界 sha256 <code>05ef97da…</code>，目录 sha256
+<code>f2466b2c…</code>。</li>
+<li>盲写作者看到过 change 目录名（c0037
+的名字暗示过「样本外有漏判」）和外层仓库的提交标题，没有看到逐 workload
+的失败。作者读不到
+<code>config/</code>，靠「把数据放在远离任何合理阈值的地方」规避阈值，这是假设，也是这个世界偏容易的原因之一（见
+11.4）。</li>
+<li>修复的第一次派发用错了仓库，被停下，没有产生文件；第二次派发在冻结之后。</li>
+</ul>
+<h3 id="结果">11.2 结果</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>指标</th>
+<th>预注册 #1 修复前</th>
+<th>预注册 #2</th>
+<th>预注册 #3</th>
+<th><strong>预注册 #4（c0047）</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>verdict_accuracy</td>
+<td>0.90（18/20）</td>
+<td>0.9167（22/24）</td>
+<td>0.9583（23/24）</td>
+<td><strong>1.0（28/28）</strong></td>
+</tr>
+<tr>
+<td>unsafe_allow</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>unknown_recall</td>
+<td>1.0</td>
+<td>0.0（0/2）</td>
+<td>1.0（4/4）</td>
+<td><strong>1.0（4/4）</strong></td>
+</tr>
+<tr>
+<td>request_in_range</td>
+<td>0.7692</td>
+<td>0.9444</td>
+<td>1.0</td>
+<td><strong>1.0（14/14）</strong></td>
+</tr>
+<tr>
+<td>realizable_accuracy</td>
+<td>0.6667</td>
+<td>无</td>
+<td>1.0（1/1）</td>
+<td><strong>1.0（14/14）</strong></td>
+</tr>
+<tr>
+<td>allow_below_recent（c0046 新增）</td>
+<td>—</td>
+<td>—</td>
+<td>（事后按新定义为 1，已污染）</td>
+<td><strong>0</strong></td>
+</tr>
+</tbody>
+</table>
+<p>28/28 的 Wilson 95% 区间下界约 0.88。record 模式 28 条叙述全部来自
+LLM；回放复现一致。</p>
+<h3 id="消融这个满分是哪个修复挣来的">11.3
+消融：这个满分是哪个修复挣来的</h3>
+<p>评估之后，用同一个世界、同一个打分器，换三个版本的 agent 代码（叙述用
+template，不影响裁决）。原始输出：<code>openspec/changes/c0047-k8s-fresh4-eval/ablation.txt</code>。</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>agent 版本</th>
+<th>verdict_accuracy</th>
+<th>unknown_recall</th>
+<th>决策数</th>
+<th>差在哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>c0043 之前（<code>ab1f0d9</code>）</td>
+<td>0.9286</td>
+<td>0.5</td>
+<td>26/28</td>
+<td>cart-archiver 最后 5 天无数据，在发现阶段消失</td>
+</tr>
+<tr>
+<td>c0043 之后、c0046 之前（<code>e169857</code>）</td>
+<td>1.0</td>
+<td>1.0</td>
+<td>28/28</td>
+<td>—</td>
+</tr>
+<tr>
+<td>当前（含 c0046）</td>
+<td>1.0</td>
+<td>1.0</td>
+<td>28/28</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>c0043（窗口发现 +
+stale_days）第一次得到样本外证据。</strong>
+它在这个没见过的世界上把一个本会被静默丢掉的 workload 变成了显式
+UNKNOWN。</li>
+<li><strong>c0046（近期用量子项）没有被这个世界检验到。</strong>
+唯一的近期阶跃样例 search-suggest（12 小时前流量 3.4 倍）同时在
+throttling（0.286 ≥ 0.05），条件 B 的老子项先判 FAIL → DENY。c0046
+之前的版本也拿满分。c0046 的证据仍只来自样本内。</li>
+</ul>
+<h3 id="能证明什么不能证明什么">11.4 能证明什么、不能证明什么</h3>
+<ul>
+<li>能证明：c0043 在样本外有效；c0046 的加入没有带来回退（28/28，新硬闸
+0）。</li>
+<li>不能证明 agent
+「已经没有失败类」。这个世界可能偏容易：作者看不到阈值，有意把数据放在远离阈值的地方，难例的「难」更多在形状上，而不在临界值附近。前三个世界的失分都出在临界情形（阈值附近的趋势、末尾
+3 小时的阶跃）。</li>
+<li>满分本身的信息量低于一次失败：它说明修复没有破坏什么，但没有暴露下一类问题。</li>
+<li>仍然：同一个生成器、同一个作者家族；n=28。</li>
+</ul>
+<h3 id="下一个世界应当怎么写只记录">11.5
+下一个世界应当怎么写（只记录）</h3>
+<ol type="1">
+<li>给作者阈值的「量级」（不是代码）：比如「throttling
+门槛在百分之几」，让难例落在门槛附近，而不是远离它。这会引入一点泄漏，要在协议里写明。</li>
+<li>专门要求「只有近期阶跃、没有 throttling」的情形，否则 c0046
+永远没有样本外证据。这一条是有意的定向，评估时要单独报告。</li>
+</ol>
+</body>
+</html>
