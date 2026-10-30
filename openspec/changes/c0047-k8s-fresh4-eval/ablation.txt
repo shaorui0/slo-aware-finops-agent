@@ -1,0 +1,12 @@
+# 消融（评估之后做，只读）：同一个第四世界、同一个指标服务、同一个打分器（HEAD），换 agent 代码版本；叙述用 template，不影响裁决。
+# ab1f0d9 = c0043 合并前；e169857 = c0046 合并前（含 c0043）；HEAD = 当前
+== agent@ab1f0d9
+{"verdict_accuracy": 0.9286, "unsafe_allow": 0, "unknown_recall": 0.5, "request_in_range": 1.0, "realizable_accuracy": 1.0, "allow_below_recent": 0}
+n={'expected': 28, 'decisions': 26, 'unknown_expected': 4, 'ranged': 14, 'realizable': 14} narrative={'template': 26}
+wrong: cart-archiver/cpu got None expect UNKNOWN, cart-archiver/memory got None expect UNKNOWN
+== agent@e169857
+{"verdict_accuracy": 1.0, "unsafe_allow": 0, "unknown_recall": 1.0, "request_in_range": 1.0, "realizable_accuracy": 1.0, "allow_below_recent": 0}
+n={'expected': 28, 'decisions': 28, 'unknown_expected': 4, 'ranged': 14, 'realizable': 14} narrative={'template': 28}
+== agent@HEAD
+{"verdict_accuracy": 1.0, "unsafe_allow": 0, "unknown_recall": 1.0, "request_in_range": 1.0, "realizable_accuracy": 1.0, "allow_below_recent": 0}
+n={'expected': 28, 'decisions': 28, 'unknown_expected': 4, 'ranged': 14, 'realizable': 14} narrative={'template': 28}

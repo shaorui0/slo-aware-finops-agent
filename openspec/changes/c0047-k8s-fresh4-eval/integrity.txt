@@ -1,0 +1,11 @@
+$ git diff --stat abda3c3 HEAD -- testenv/heldout/k8s_fresh4_world.yaml testenv/heldout/k8s_fresh4_slos.yaml testenv/test_k8s_fresh4.py
+（空）
+$ shasum -a 256 testenv/heldout/k8s_fresh4_world.yaml testenv/heldout/k8s_fresh4_slos.yaml
+05ef97dae2c202f510c20fcfc12659e4ceb950f371d2740f78797997b46b8a09  testenv/heldout/k8s_fresh4_world.yaml
+f2466b2cc1d7e3449b5f1349c98abf2f016577333d4a0477850bbdf736eb58d5  testenv/heldout/k8s_fresh4_slos.yaml
+$ 冻结与修复的提交时间
+abda3c3 2026-10-30 23:12:32 +0900 c0045-k8s-fresh4-freeze [3/4 freeze]: 冻结第四个预注册世界、SLO 目录、daily_burst 生成器与测试
+d659d0b 2026-10-30 23:23:16 +0900 c0046-k8s-recent-regime [1/4 proposal]: 条件 B 近期用量子项 + 打分器 allow_below_recent 硬闸门（修 EXPERIMENTS §10 的窗口代表性缺陷）
+a4b39da 2026-10-30 23:23:17 +0900 c0046-k8s-recent-regime [2/4 spec+tasks]: 近期子项判 UNKNOWN 的理由、证据口径、allow_below_recent 定义与验收命令
+$ c0046 分支是否包含冻结提交
+does not contain

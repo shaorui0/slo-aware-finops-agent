@@ -1,0 +1,6 @@
+k8s run k8s-fresh4-replay (as_of 2026-10-29T23:55:00Z): 28 decisions {'ALLOW': 12, 'DENY': 6, 'NOOP': 4, 'REQUIRE_APPROVAL': 2, 'UNKNOWN': 4}, plans 14, ledger {'new': 14, 'unchanged': 0, 'expired': 0, 'halted': 0, 'approved': 0, 'suppressed': 0, 'held': 0}, narrative {'llm': 28}
+runs/k8s-fresh4-replay/k8s_decisions.json
+{"verdict_accuracy": 1.0, "unsafe_allow": 0, "unknown_recall": 1.0, "request_in_range": 1.0, "realizable_accuracy": 1.0, "allow_below_recent": 0}
+n={'expected': 28, 'decisions': 28, 'unknown_expected': 4, 'ranged': 14, 'realizable': 14} narrative={'llm': 28}
+gates: pass
+exit=0
