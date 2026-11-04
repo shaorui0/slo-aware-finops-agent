@@ -10,3 +10,4 @@ __pycache__/
 runs/
 .aws_server.pid
 .metrics_server.pid
+.claude/worktrees/
